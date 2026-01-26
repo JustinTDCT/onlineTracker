@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Save, X, Eye, EyeOff, UserPlus, UserX, Clock, RefreshCw, Activity, Users, Bell } from 'lucide-react';
-import { getSettings, updateSettings, getPendingAgents, approvePendingAgent, dismissPendingAgent } from '../api/client';
+import { Save, X, Eye, EyeOff, UserPlus, UserX, Clock, RefreshCw, Activity, Users, Bell, Mail } from 'lucide-react';
+import { getSettings, updateSettings, getPendingAgents, approvePendingAgent, dismissPendingAgent, testEmail } from '../api/client';
 import type { PendingAgent, Settings } from '../types';
 
 type SettingsTab = 'monitoring' | 'agents' | 'alerts';
@@ -44,6 +44,8 @@ export default function SettingsPage() {
   const [alertEmailFrom, setAlertEmailFrom] = useState('');
   const [alertEmailTo, setAlertEmailTo] = useState('');
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -168,6 +170,22 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleTestEmail() {
+    setTestingEmail(true);
+    setEmailTestResult(null);
+    setError(null);
+
+    try {
+      const result = await testEmail();
+      setEmailTestResult(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send test email';
+      setEmailTestResult({ success: false, message });
+    } finally {
+      setTestingEmail(false);
     }
   }
 
@@ -607,6 +625,33 @@ export default function SettingsPage() {
                       <label htmlFor="smtpUseTls" className="settings-checkbox-label">
                         Use TLS/STARTTLS
                       </label>
+                    </div>
+
+                    {/* Test Email Button */}
+                    <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <button
+                        type="button"
+                        onClick={handleTestEmail}
+                        disabled={!emailAlertsEnabled || testingEmail}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                      >
+                        <Mail className="h-4 w-4" />
+                        {testingEmail ? 'Sending...' : 'Send Test Email'}
+                      </button>
+                      <p className="settings-help mt-2">
+                        Save settings first, then send a test email to verify your SMTP configuration.
+                        Check server logs for detailed diagnostics if the test fails.
+                      </p>
+
+                      {emailTestResult && (
+                        <div className={`mt-3 p-3 rounded-lg ${
+                          emailTestResult.success 
+                            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                            : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                        }`}>
+                          {emailTestResult.message}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

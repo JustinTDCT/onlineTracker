@@ -148,6 +148,12 @@ export async function updateSettings(data: Partial<Settings>): Promise<Settings>
   });
 }
 
+export async function testEmail(): Promise<{ success: boolean; message: string }> {
+  return fetchJson(`${API_BASE}/settings/test-email`, {
+    method: 'POST',
+  });
+}
+
 // Status
 export async function getStatusOverview(): Promise<StatusOverview> {
   return fetchJson(`${API_BASE}/status/overview`);
