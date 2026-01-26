@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertCircle, Calendar, CheckCircle, Clock, HelpCircle, Server, TrendingUp } from 'lucide-react';
+import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, HelpCircle, Server, TrendingUp } from 'lucide-react';
 import { getMonitors, getMonitorHistory, getAgents } from '../api/client';
 import type { Monitor, StatusHistoryPoint, Agent } from '../types';
 import MiniStatusGraph from './MiniStatusGraph';
@@ -23,6 +23,8 @@ const TIME_RANGES: TimeRange[] = [
   { label: 'Last Year', hours: 8760, uptimeLabel: '1y Uptime' },
 ];
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 export default function Dashboard() {
   const [monitors, setMonitors] = useState<MonitorWithHistory[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -30,6 +32,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<TimeRange>(TIME_RANGES[0]);
   const [selectedAgent, setSelectedAgent] = useState<string>('all'); // 'all', 'server', or agent_id
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     loadAgents();
@@ -82,6 +86,17 @@ export default function Dashboard() {
     if (selectedAgent === 'server') return monitors.filter(m => !m.agent_id);
     return monitors.filter(m => m.agent_id === selectedAgent);
   }, [monitors, selectedAgent]);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedAgent, pageSize]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredMonitors.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedMonitors = filteredMonitors.slice(startIndex, endIndex);
 
   // Create agent lookup map for display
   const agentMap = useMemo(() => {
@@ -271,81 +286,120 @@ export default function Dashboard() {
             )}
           </div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {filteredMonitors.map((monitor) => {
-              const uptime = monitor.history.length
-                ? (monitor.history.filter(h => h.status === 'up').length / monitor.history.length) * 100
-                : 0;
-              
-              return (
-                <div
-                  key={monitor.id}
-                  className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-4"
-                >
-                  {/* Status icon */}
-                  <div className={`p-2 rounded-lg shrink-0 ${statusBgColor(monitor.latest_status?.status)}`}>
-                    {statusIcon(monitor.latest_status?.status)}
-                  </div>
-                  
-                  {/* Name, description, target */}
-                  <div className="min-w-0 w-48 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-gray-900 dark:text-white truncate">{monitor.name}</p>
-                      <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded shrink-0">
-                        {monitor.type.toUpperCase()}
-                      </span>
+          <>
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+              {paginatedMonitors.map((monitor) => {
+                const uptime = monitor.history.length
+                  ? (monitor.history.filter(h => h.status === 'up').length / monitor.history.length) * 100
+                  : 0;
+                
+                return (
+                  <div
+                    key={monitor.id}
+                    className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-4"
+                  >
+                    {/* Status icon */}
+                    <div className={`p-2 rounded-lg shrink-0 ${statusBgColor(monitor.latest_status?.status)}`}>
+                      {statusIcon(monitor.latest_status?.status)}
                     </div>
-                    {monitor.description && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{monitor.description}</p>
-                    )}
-                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{monitor.target}</p>
-                  </div>
-                  
-                  {/* Agent column */}
-                  <div className="shrink-0 w-20 text-center">
-                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                      {getAgentDisplayName(monitor.agent_id)}
-                    </span>
-                  </div>
-                  
-                  {/* Response column */}
-                  <div className="shrink-0 w-20 text-center">
-                    {monitor.type === 'ssl' ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-600 dark:text-gray-300">
-                          {monitor.latest_status?.ssl_expiry_days !== undefined
-                            ? `${monitor.latest_status.ssl_expiry_days}d`
-                            : '-'}
+                    
+                    {/* Name, description, target */}
+                    <div className="min-w-0 w-48 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">{monitor.name}</p>
+                        <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded shrink-0">
+                          {monitor.type.toUpperCase()}
                         </span>
                       </div>
-                    ) : (
-                      <span className="text-sm text-gray-600 dark:text-gray-300">
-                        {monitor.latest_status?.response_time_ms !== undefined
-                          ? `${monitor.latest_status.response_time_ms}ms`
-                          : '-'}
+                      {monitor.description && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{monitor.description}</p>
+                      )}
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{monitor.target}</p>
+                    </div>
+                    
+                    {/* Agent column */}
+                    <div className="shrink-0 w-20 text-center">
+                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        {getAgentDisplayName(monitor.agent_id)}
                       </span>
-                    )}
+                    </div>
+                    
+                    {/* Response column */}
+                    <div className="shrink-0 w-20 text-center">
+                      {monitor.type === 'ssl' ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm text-gray-600 dark:text-gray-300">
+                            {monitor.latest_status?.ssl_expiry_days !== undefined
+                              ? `${monitor.latest_status.ssl_expiry_days}d`
+                              : '-'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {monitor.latest_status?.response_time_ms !== undefined
+                            ? `${monitor.latest_status.response_time_ms}ms`
+                            : '-'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Mini status graph - takes remaining space */}
+                    <div className="flex-1 min-w-0">
+                      <MiniStatusGraph history={monitor.history} />
+                    </div>
+                    
+                    {/* Status and uptime */}
+                    <div className="text-right shrink-0 w-24">
+                      <p className={`font-medium ${statusColor(monitor.latest_status?.status)}`}>
+                        {monitor.latest_status?.status
+                          ? monitor.latest_status.status.charAt(0).toUpperCase() + monitor.latest_status.status.slice(1)
+                          : 'Unknown'}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{uptime.toFixed(1)}%</p>
+                    </div>
                   </div>
-                  
-                  {/* Mini status graph - takes remaining space */}
-                  <div className="flex-1 min-w-0">
-                    <MiniStatusGraph history={monitor.history} />
-                  </div>
-                  
-                  {/* Status and uptime */}
-                  <div className="text-right shrink-0 w-24">
-                    <p className={`font-medium ${statusColor(monitor.latest_status?.status)}`}>
-                      {monitor.latest_status?.status
-                        ? monitor.latest_status.status.charAt(0).toUpperCase() + monitor.latest_status.status.slice(1)
-                        : 'Unknown'}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{uptime.toFixed(1)}%</p>
-                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="pagination">
+                <div className="pagination-info">
+                  Showing {startIndex + 1}-{Math.min(endIndex, filteredMonitors.length)} of {filteredMonitors.length}
                 </div>
-              );
-            })}
-          </div>
+                <div className="pagination-controls">
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="pagination-select"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>{size} per page</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="pagination-btn"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="pagination-btn"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

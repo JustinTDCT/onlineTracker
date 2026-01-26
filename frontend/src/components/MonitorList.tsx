@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Plus,
   Pencil,
@@ -8,6 +8,8 @@ import {
   AlertCircle,
   HelpCircle,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   getMonitors,
@@ -20,6 +22,8 @@ import {
 } from '../api/client';
 import type { Monitor, MonitorCreate, MonitorTestResult, Agent } from '../types';
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 export default function MonitorList() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -28,6 +32,19 @@ export default function MonitorList() {
   const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; result: MonitorTestResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Pagination calculations
+  const totalPages = useMemo(() => Math.ceil(monitors.length / pageSize), [monitors.length, pageSize]);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedMonitors = useMemo(() => monitors.slice(startIndex, endIndex), [monitors, startIndex, endIndex]);
+
+  // Reset to page 1 when page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize]);
 
   useEffect(() => {
     loadData();
@@ -176,7 +193,7 @@ export default function MonitorList() {
                 </td>
               </tr>
             ) : (
-              monitors.map((monitor) => (
+              paginatedMonitors.map((monitor) => (
                 <tr key={monitor.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {statusIcon(monitor.latest_status?.status)}
@@ -248,6 +265,43 @@ export default function MonitorList() {
             )}
           </tbody>
         </table>
+        
+        {/* Pagination controls */}
+        {monitors.length > 0 && totalPages > 1 && (
+          <div className="pagination">
+            <div className="pagination-info">
+              Showing {startIndex + 1}-{Math.min(endIndex, monitors.length)} of {monitors.length}
+            </div>
+            <div className="pagination-controls">
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="pagination-select"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>{size} per page</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="pagination-btn"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="pagination-btn"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Test result modal */}
