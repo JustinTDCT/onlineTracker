@@ -92,6 +92,7 @@ class CheckerService:
         
         expected_status = config.get("expected_status")
         expected_hash = config.get("expected_body_hash")
+        expected_content = config.get("expected_content")
         
         try:
             start = datetime.now()
@@ -112,6 +113,17 @@ class CheckerService:
                     details=f"Expected status {expected_status}, got {response.status_code}",
                     body_hash=body_hash,
                 )
+            
+            # Check expected content in response body
+            if expected_content:
+                response_text = response.text
+                if expected_content not in response_text:
+                    return CheckResult(
+                        status="down",
+                        response_time_ms=response_time,
+                        details=f"Expected content not found: '{expected_content[:50]}{'...' if len(expected_content) > 50 else ''}'",
+                        body_hash=body_hash,
+                    )
             
             # Check expected body hash
             if expected_hash and body_hash != expected_hash:

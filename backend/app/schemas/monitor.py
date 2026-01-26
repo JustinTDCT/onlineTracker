@@ -8,6 +8,7 @@ class MonitorConfig(BaseModel):
     """Configuration for monitor checks."""
     expected_status: Optional[int] = None  # HTTP status code
     expected_body_hash: Optional[str] = None  # MD5 hash of expected response
+    expected_content: Optional[str] = None  # Text that must be present in response body
     timeout_seconds: int = 10
 
 

@@ -275,6 +275,9 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
   const [expectedStatus, setExpectedStatus] = useState(
     monitor?.config?.expected_status?.toString() || ''
   );
+  const [expectedContent, setExpectedContent] = useState(
+    monitor?.config?.expected_content || ''
+  );
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -284,6 +287,9 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
     const config: Record<string, unknown> = {};
     if (expectedStatus) {
       config.expected_status = parseInt(expectedStatus, 10);
+    }
+    if (expectedContent) {
+      config.expected_content = expectedContent;
     }
 
     await onSave({
@@ -377,18 +383,35 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
           </div>
 
           {(type === 'http' || type === 'https') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Expected Status Code (optional)
-              </label>
-              <input
-                type="number"
-                value={expectedStatus}
-                onChange={(e) => setExpectedStatus(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
-                placeholder="200"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Expected Status Code (optional)
+                </label>
+                <input
+                  type="number"
+                  value={expectedStatus}
+                  onChange={(e) => setExpectedStatus(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                  placeholder="200"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Expected Content (optional)
+                </label>
+                <input
+                  type="text"
+                  value={expectedContent}
+                  onChange={(e) => setExpectedContent(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                  placeholder="Text that must appear on the page"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Monitor will be marked DOWN if this text is not found in the response
+                </p>
+              </div>
+            </>
           )}
 
           <div className="flex items-center gap-2">

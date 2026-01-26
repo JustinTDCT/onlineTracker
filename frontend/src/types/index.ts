@@ -2,6 +2,7 @@
 export interface MonitorConfig {
   expected_status?: number;
   expected_body_hash?: string;
+  expected_content?: string;
   timeout_seconds?: number;
 }
 
