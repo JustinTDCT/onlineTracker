@@ -46,6 +46,23 @@ export interface StatusHistoryPoint {
   response_time_avg_ms?: number;
 }
 
+export interface MonitorResult {
+  id: number;
+  checked_at: string;
+  status: 'up' | 'down' | 'degraded' | 'unknown';
+  response_time_ms?: number;
+  details?: string;
+  ssl_expiry_days?: number;
+}
+
+export interface ResultsPage {
+  items: MonitorResult[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
 export interface MonitorTestResult {
   status: string;
   response_time_ms?: number;

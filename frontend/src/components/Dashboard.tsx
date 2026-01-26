@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, Filter, HelpCircle, Search, Server, TrendingUp } from 'lucide-react';
 import { getMonitors, getMonitorHistory, getAgents } from '../api/client';
 import type { Monitor, StatusHistoryPoint, Agent } from '../types';
@@ -28,6 +28,7 @@ const TIME_RANGES: TimeRange[] = [
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [monitors, setMonitors] = useState<MonitorWithHistory[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -349,7 +350,8 @@ export default function Dashboard() {
                 return (
                   <div
                     key={monitor.id}
-                    className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-4"
+                    onClick={() => navigate(`/monitor/${monitor.id}`)}
+                    className="clickable-row px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-4"
                   >
                     {/* Status icon */}
                     <div className={`p-2 rounded-lg shrink-0 ${statusBgColor(monitor.latest_status?.status)}`}>

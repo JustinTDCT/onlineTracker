@@ -20,6 +20,7 @@ from ..schemas.monitor import (
     PollPageRequest,
     PollPageResponse,
 )
+from ..schemas.status import MonitorResult, ResultsPage
 from ..services.checker import checker_service
 
 import httpx
@@ -387,3 +388,68 @@ async def get_monitor_history(
         current_time = bucket_end
     
     return history
+
+
+@router.get("/{monitor_id}/results", response_model=ResultsPage)
+async def get_monitor_results(
+    monitor_id: int,
+    hours: int = Query(default=24, ge=1, le=8760),  # Max 1 year
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=25, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get paginated individual check results for a monitor."""
+    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    monitor = result.scalar_one_or_none()
+    
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    
+    # Get total count
+    count_result = await db.execute(
+        select(func.count(MonitorStatus.id))
+        .where(
+            MonitorStatus.monitor_id == monitor_id,
+            MonitorStatus.checked_at >= cutoff,
+        )
+    )
+    total = count_result.scalar() or 0
+    
+    # Calculate pagination
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    offset = (page - 1) * per_page
+    
+    # Get paginated results
+    status_result = await db.execute(
+        select(MonitorStatus)
+        .where(
+            MonitorStatus.monitor_id == monitor_id,
+            MonitorStatus.checked_at >= cutoff,
+        )
+        .order_by(MonitorStatus.checked_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    statuses = status_result.scalars().all()
+    
+    items = [
+        MonitorResult(
+            id=s.id,
+            checked_at=s.checked_at.isoformat(),
+            status=s.status,
+            response_time_ms=s.response_time_ms,
+            details=s.details,
+            ssl_expiry_days=s.ssl_expiry_days,
+        )
+        for s in statuses
+    ]
+    
+    return ResultsPage(
+        items=items,
+        total=total,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+    )

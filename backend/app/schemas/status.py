@@ -3,6 +3,25 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class MonitorResult(BaseModel):
+    """Individual check result record."""
+    id: int
+    checked_at: str
+    status: str  # up, down, degraded, unknown
+    response_time_ms: Optional[int] = None
+    details: Optional[str] = None
+    ssl_expiry_days: Optional[int] = None
+
+
+class ResultsPage(BaseModel):
+    """Paginated results response."""
+    items: List[MonitorResult]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
 class MonitorSummary(BaseModel):
     """Summary of a monitor for dashboard."""
     id: int

@@ -8,6 +8,7 @@ import type {
   Settings,
   StatusOverview,
   PollPageResult,
+  ResultsPage,
 } from '../types';
 
 const API_BASE = '/api';
@@ -83,6 +84,17 @@ export async function getMonitorHistory(
   hours = 72
 ): Promise<StatusHistoryPoint[]> {
   return fetchJson(`${API_BASE}/monitors/${id}/history?hours=${hours}`);
+}
+
+export async function getMonitorResults(
+  id: number,
+  hours = 24,
+  page = 1,
+  perPage = 25
+): Promise<ResultsPage> {
+  return fetchJson(
+    `${API_BASE}/monitors/${id}/results?hours=${hours}&page=${page}&per_page=${perPage}`
+  );
 }
 
 // Agents

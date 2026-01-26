@@ -6,6 +6,7 @@ A Docker-based service monitoring system with support for distributed agents.
 
 - **Multiple check types**: Ping, HTTP/HTTPS, SSL certificate monitoring
 - **72-hour status history** with visual graphs (like status.cursor.com)
+- **Monitor detail page**: Click any monitor to view detailed status, uptime histograms (24h/week/month/year), and paginated check results
 - **Webhook alerts** for status changes and SSL expiry warnings
 - **Agent mode** for distributed monitoring from multiple locations
 - **SQLite database** - no external dependencies
@@ -173,7 +174,8 @@ Both checks must pass for an agent to register. This prevents:
 - `PUT /api/monitors/{id}` - Update monitor
 - `DELETE /api/monitors/{id}` - Delete monitor
 - `POST /api/monitors/{id}/test` - Test monitor
-- `GET /api/monitors/{id}/history` - Status history
+- `GET /api/monitors/{id}/history` - Status history (aggregated 15-min buckets)
+- `GET /api/monitors/{id}/results` - Paginated individual check results
 
 ### Agents
 - `GET /api/agents` - List agents

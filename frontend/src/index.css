@@ -121,6 +121,152 @@ body {
   @apply opacity-50 pointer-events-none;
 }
 
+/* Clickable row styles */
+.clickable-row {
+  @apply cursor-pointer;
+}
+
+/* Monitor detail page styles */
+.monitor-detail-status-card {
+  @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6;
+  @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4;
+}
+
+.monitor-detail-status-metrics {
+  @apply flex flex-wrap gap-6;
+}
+
+.monitor-detail-metric {
+  @apply flex items-center gap-3;
+}
+
+.monitor-detail-section {
+  @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6;
+}
+
+.monitor-detail-section-title {
+  @apply text-lg font-semibold text-gray-900 dark:text-white mb-4;
+}
+
+/* Histogram styles */
+.histogram-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+}
+
+.histogram-card {
+  @apply bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4;
+}
+
+.histogram-header {
+  @apply flex items-center justify-between mb-3;
+}
+
+.histogram-title {
+  @apply text-sm font-medium text-gray-900 dark:text-white;
+}
+
+.histogram-uptime {
+  @apply text-sm text-gray-500 dark:text-gray-400;
+}
+
+.histogram-chart {
+  @apply h-24 flex items-end;
+}
+
+.histogram-empty {
+  @apply flex-1 flex items-center justify-center text-sm text-gray-400 dark:text-gray-500;
+}
+
+.histogram-bars {
+  @apply flex-1 flex items-end gap-0.5 h-full;
+}
+
+.histogram-bar-wrapper {
+  @apply flex-1 h-full flex items-end;
+}
+
+.histogram-bar {
+  @apply w-full rounded-t transition-all;
+}
+
+.histogram-footer {
+  @apply mt-2 text-center;
+}
+
+.histogram-period-label {
+  @apply text-xs text-gray-400 dark:text-gray-500;
+}
+
+/* Results table styles */
+.results-table-container {
+  @apply space-y-4;
+}
+
+.results-table-header {
+  @apply flex items-center justify-between;
+}
+
+.results-table-title {
+  @apply text-lg font-semibold text-gray-900 dark:text-white;
+}
+
+.results-table-select {
+  @apply text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5;
+  @apply text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-indigo-500;
+}
+
+.results-table-loading {
+  @apply flex items-center justify-center py-12;
+}
+
+.results-table-error {
+  @apply py-8 text-center text-red-500 dark:text-red-400;
+}
+
+.results-table-empty {
+  @apply py-8 text-center text-gray-500 dark:text-gray-400;
+}
+
+.results-table {
+  @apply w-full text-sm;
+}
+
+.results-table thead {
+  @apply border-b border-gray-200 dark:border-gray-700;
+}
+
+.results-table th {
+  @apply px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider;
+}
+
+.results-table tbody tr {
+  @apply border-b border-gray-100 dark:border-gray-700/50;
+}
+
+.results-table tbody tr:hover {
+  @apply bg-gray-50 dark:bg-gray-700/30;
+}
+
+.results-table td {
+  @apply px-4 py-3;
+}
+
+.results-table-timestamp {
+  @apply text-gray-600 dark:text-gray-300 whitespace-nowrap;
+}
+
+.results-table-status {
+  @apply inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.results-table-response {
+  @apply text-gray-600 dark:text-gray-300;
+}
+
+.results-table-details {
+  @apply text-gray-500 dark:text-gray-400 max-w-xs truncate;
+}
+
 /* Footer styles */
 .site-footer {
   @apply py-2 text-center text-xs text-gray-500 dark:text-gray-400;
