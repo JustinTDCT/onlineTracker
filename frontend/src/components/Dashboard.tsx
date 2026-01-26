@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, HelpCircle, Search, Server, TrendingUp } from 'lucide-react';
+import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, Filter, HelpCircle, Search, Server, TrendingUp } from 'lucide-react';
 import { getMonitors, getMonitorHistory, getAgents } from '../api/client';
 import type { Monitor, StatusHistoryPoint, Agent } from '../types';
 import MiniStatusGraph from './MiniStatusGraph';
+
+type TypeFilter = 'all' | 'ping' | 'http' | 'ssl';
 
 interface MonitorWithHistory extends Monitor {
   history: StatusHistoryPoint[];
@@ -32,6 +34,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<TimeRange>(TIME_RANGES[0]);
   const [selectedAgent, setSelectedAgent] = useState<string>('all'); // 'all', 'server', or agent_id
+  const [selectedType, setSelectedType] = useState<TypeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -81,7 +84,7 @@ export default function Dashboard() {
     }
   }
 
-  // Filter monitors based on selected agent and search query
+  // Filter monitors based on selected agent, type, and search query
   const filteredMonitors = useMemo(() => {
     let result = monitors;
     
@@ -90,6 +93,15 @@ export default function Dashboard() {
       result = result.filter(m => !m.agent_id);
     } else if (selectedAgent !== 'all') {
       result = result.filter(m => m.agent_id === selectedAgent);
+    }
+    
+    // Filter by type
+    if (selectedType !== 'all') {
+      if (selectedType === 'http') {
+        result = result.filter(m => m.type === 'http' || m.type === 'https');
+      } else {
+        result = result.filter(m => m.type === selectedType);
+      }
     }
     
     // Filter by search query
@@ -103,12 +115,12 @@ export default function Dashboard() {
     }
     
     return result;
-  }, [monitors, selectedAgent, searchQuery]);
+  }, [monitors, selectedAgent, selectedType, searchQuery]);
 
   // Reset to page 1 when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedAgent, searchQuery, pageSize]);
+  }, [selectedAgent, selectedType, searchQuery, pageSize]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredMonitors.length / pageSize);
@@ -259,13 +271,26 @@ export default function Dashboard() {
               />
             </div>
             <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-400" />
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as TypeFilter)}
+                className="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="all">All Types</option>
+                <option value="ping">Ping</option>
+                <option value="http">HTTP/HTTPS</option>
+                <option value="ssl">SSL</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
               <Server className="h-4 w-4 text-gray-400" />
               <select
                 value={selectedAgent}
                 onChange={(e) => setSelectedAgent(e.target.value)}
                 className="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="all">All</option>
+                <option value="all">All Agents</option>
                 <option value="server">Server</option>
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>
@@ -309,10 +334,8 @@ export default function Dashboard() {
                   Add one
                 </Link>
               </>
-            ) : searchQuery ? (
-              'No monitors match your search.'
             ) : (
-              'No monitors match the selected filter.'
+              'No monitors match your filters.'
             )}
           </div>
         ) : (

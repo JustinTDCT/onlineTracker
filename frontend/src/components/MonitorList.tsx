@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  Filter,
 } from 'lucide-react';
 import {
   getMonitors,
@@ -23,6 +24,8 @@ import {
 } from '../api/client';
 import type { Monitor, MonitorCreate, MonitorTestResult, Agent } from '../types';
 
+type TypeFilter = 'all' | 'ping' | 'http' | 'ssl';
+
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export default function MonitorList() {
@@ -34,19 +37,35 @@ export default function MonitorList() {
   const [testResult, setTestResult] = useState<{ id: number; result: MonitorTestResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<TypeFilter>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Filter monitors based on search query
+  // Filter monitors based on search query and type
   const filteredMonitors = useMemo(() => {
-    if (!searchQuery.trim()) return monitors;
-    const query = searchQuery.toLowerCase().trim();
-    return monitors.filter(m => 
-      m.name.toLowerCase().includes(query) ||
-      (m.description && m.description.toLowerCase().includes(query)) ||
-      m.target.toLowerCase().includes(query)
-    );
-  }, [monitors, searchQuery]);
+    let result = monitors;
+    
+    // Filter by type
+    if (selectedType !== 'all') {
+      if (selectedType === 'http') {
+        result = result.filter(m => m.type === 'http' || m.type === 'https');
+      } else {
+        result = result.filter(m => m.type === selectedType);
+      }
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(m => 
+        m.name.toLowerCase().includes(query) ||
+        (m.description && m.description.toLowerCase().includes(query)) ||
+        m.target.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
+  }, [monitors, selectedType, searchQuery]);
 
   // Pagination calculations
   const totalPages = useMemo(() => Math.ceil(filteredMonitors.length / pageSize), [filteredMonitors.length, pageSize]);
@@ -57,7 +76,7 @@ export default function MonitorList() {
   // Reset to page 1 when filter or page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, pageSize]);
+  }, [searchQuery, selectedType, pageSize]);
 
   useEffect(() => {
     loadData();
@@ -148,6 +167,19 @@ export default function MonitorList() {
               className="search-input w-64"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value as TypeFilter)}
+              className="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Types</option>
+              <option value="ping">Ping</option>
+              <option value="http">HTTP/HTTPS</option>
+              <option value="ssl">SSL</option>
+            </select>
+          </div>
           <button
             onClick={() => {
               setEditingMonitor(null);
@@ -216,7 +248,7 @@ export default function MonitorList() {
                 <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                   {monitors.length === 0 
                     ? 'No monitors configured. Click "Add Monitor" to create one.'
-                    : 'No monitors match your search.'}
+                    : 'No monitors match your filters.'}
                 </td>
               </tr>
             ) : (
