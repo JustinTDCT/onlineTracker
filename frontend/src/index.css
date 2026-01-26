@@ -55,6 +55,72 @@ body {
   @apply absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400;
 }
 
+/* Settings tabs */
+.settings-tabs {
+  @apply flex border-b border-gray-200 dark:border-gray-700 mb-6;
+}
+
+.settings-tab {
+  @apply px-4 py-2 text-sm font-medium cursor-pointer transition-colors;
+  @apply text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300;
+  @apply border-b-2 border-transparent -mb-px;
+}
+
+.settings-tab-active {
+  @apply text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400;
+}
+
+/* Settings section card */
+.settings-card {
+  @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-6;
+}
+
+.settings-card-title {
+  @apply text-lg font-semibold text-gray-900 dark:text-white;
+}
+
+/* Settings form elements */
+.settings-label {
+  @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
+}
+
+.settings-input {
+  @apply w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2;
+  @apply focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+}
+
+.settings-select {
+  @apply w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2;
+  @apply focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+}
+
+.settings-textarea {
+  @apply w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2;
+  @apply focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+}
+
+.settings-help {
+  @apply mt-1 text-sm text-gray-500 dark:text-gray-400;
+}
+
+.settings-checkbox-wrapper {
+  @apply flex items-center gap-3;
+}
+
+.settings-checkbox {
+  @apply h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-600 rounded;
+  @apply focus:ring-2 focus:ring-indigo-500;
+}
+
+.settings-checkbox-label {
+  @apply text-sm font-medium text-gray-700 dark:text-gray-300;
+}
+
+/* Disabled section styling */
+.settings-disabled {
+  @apply opacity-50 pointer-events-none;
+}
+
 /* Footer styles */
 .site-footer {
   @apply py-2 text-center text-xs text-gray-500 dark:text-gray-400;

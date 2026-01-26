@@ -82,12 +82,33 @@ export interface PendingAgent {
 
 // Settings types
 export interface Settings {
-  agent_timeout_minutes: number;
+  // Monitoring
   check_interval_seconds: number;
   ssl_warn_days: string;
-  webhook_url?: string;
+  
+  // Agents
+  agent_timeout_minutes: number;
   shared_secret?: string;
   allowed_agent_uuids?: string;
+  
+  // Alerts
+  alert_type: 'once' | 'repeated' | 'none';
+  alert_repeat_frequency_minutes: number;
+  alert_on_restored: boolean;
+  alert_include_history: 'event_only' | 'last_24h';
+  
+  // Webhook
+  webhook_url?: string;
+  
+  // Email
+  email_alerts_enabled: boolean;
+  smtp_host?: string;
+  smtp_port: number;
+  smtp_username?: string;
+  smtp_password?: string;
+  smtp_use_tls: boolean;
+  alert_email_from?: string;
+  alert_email_to?: string;
 }
 
 // Status overview

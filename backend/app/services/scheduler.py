@@ -131,14 +131,15 @@ class SchedulerService:
                     )
                     session.add(ping_result)
             
-            # Check for state change and trigger alert
-            if last_status and last_status.status != check_result.status:
-                await alerter_service.send_alert(
-                    session,
-                    monitor,
-                    check_result.status,
-                    check_result.details,
-                )
+            # Trigger alert logic (handles state changes and repeated alerts)
+            old_status_str = last_status.status if last_status else None
+            await alerter_service.send_alert(
+                session,
+                monitor,
+                check_result.status,
+                check_result.details,
+                old_status_str,
+            )
             
             logger.debug(f"Monitor {monitor.name}: {check_result.status}")
             

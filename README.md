@@ -66,9 +66,24 @@ In server mode, OnlineTracker:
 4. Enter target and configuration
 5. Click "Test" to verify, then "Save"
 
-### Webhook Configuration
+### Alert Configuration
 
-Go to Settings and configure your webhook URL. Alerts are sent as JSON:
+Go to Settings > Alerts to configure notifications. OnlineTracker supports:
+
+#### Alert Behavior
+- **Alert Type**: Control when alerts are sent
+  - **Once** (default): Alert only when status changes (down → up or up → down)
+  - **Repeated**: Continue sending alerts at intervals while service is down
+  - **None**: Disable all alerts
+- **Repeat Frequency**: When using "Repeated", how often to resend (1-1440 minutes)
+- **Alert on Restored**: Send an alert when a service comes back up
+- **Include History**: Include status history in email alerts
+  - **Event only**: Just the current event details
+  - **Last 24 hours**: Include recent check history
+
+#### Webhook Alerts
+
+Configure a webhook URL to receive JSON alerts (Slack, Discord, etc.):
 
 ```json
 {
@@ -80,6 +95,18 @@ Go to Settings and configure your webhook URL. Alerts are sent as JSON:
   "timestamp": "2026-01-26T10:30:00Z"
 }
 ```
+
+#### Email Alerts
+
+Configure SMTP settings to receive email notifications:
+
+- **SMTP Host/Port**: Your mail server (e.g., smtp.gmail.com:587)
+- **SMTP Username/Password**: Authentication credentials
+- **Use TLS**: Enable STARTTLS (recommended)
+- **From Address**: Sender address (defaults to SMTP username)
+- **Alert Email**: Recipient address for alerts
+
+Email subject format: `DOWN - <monitor> - <agent> - <type>`
 
 ## Agent Mode
 
