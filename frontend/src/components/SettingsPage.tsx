@@ -509,14 +509,14 @@ export default function SettingsPage() {
                   <div>
                     <label className="settings-label">Alert Email (To)</label>
                     <input
-                      type="email"
+                      type="text"
                       value={alertEmailTo}
                       onChange={(e) => setAlertEmailTo(e.target.value)}
                       className="settings-input"
-                      placeholder="alerts@yourcompany.com"
+                      placeholder="alerts@company.com, ops@company.com"
                       disabled={!emailAlertsEnabled}
                     />
-                    <p className="settings-help">Where to send alert emails</p>
+                    <p className="settings-help">Comma-separated list of email addresses</p>
                   </div>
 
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
