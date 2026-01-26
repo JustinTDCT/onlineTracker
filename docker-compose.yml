@@ -33,7 +33,7 @@ services:
       - MODE=agent
       - AGENT_NAME=TAB2
       - SERVER_HOST=onlinetracker-server
-      - COMS_PORT=8000
+      - COMS_PORT=19443
       - SHARED_SECRET=test-secret-change-me
     volumes:
       - onlinetracker-agent-data:/data
