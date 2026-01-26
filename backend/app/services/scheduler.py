@@ -133,9 +133,9 @@ class SchedulerService:
             logger.error(f"Error checking monitor {monitor.id}: {e}")
     
     async def _cleanup_old_records(self):
-        """Delete status records older than 72 hours."""
+        """Delete status records older than 365 days."""
         try:
-            cutoff = datetime.utcnow() - timedelta(hours=72)
+            cutoff = datetime.utcnow() - timedelta(days=365)
             
             async with async_session() as session:
                 await session.execute(
