@@ -186,39 +186,41 @@ export default function Dashboard() {
               return (
                 <div
                   key={monitor.id}
-                  className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-4"
                 >
-                  {/* Top row: status, name, type badge, uptime */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${statusBgColor(monitor.latest_status?.status)}`}>
-                        {statusIcon(monitor.latest_status?.status)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-gray-900 dark:text-white">{monitor.name}</p>
-                          <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
-                            {monitor.type.toUpperCase()}
-                          </span>
-                        </div>
-                        {monitor.description && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{monitor.description}</p>
-                        )}
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{monitor.target}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-medium ${statusColor(monitor.latest_status?.status)}`}>
-                        {monitor.latest_status?.status
-                          ? monitor.latest_status.status.charAt(0).toUpperCase() + monitor.latest_status.status.slice(1)
-                          : 'Unknown'}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{uptime.toFixed(1)}% uptime</p>
-                    </div>
+                  {/* Status icon */}
+                  <div className={`p-2 rounded-lg shrink-0 ${statusBgColor(monitor.latest_status?.status)}`}>
+                    {statusIcon(monitor.latest_status?.status)}
                   </div>
                   
-                  {/* Mini status graph */}
-                  <MiniStatusGraph history={monitor.history} />
+                  {/* Name, description, target */}
+                  <div className="min-w-0 w-48 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900 dark:text-white truncate">{monitor.name}</p>
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded shrink-0">
+                        {monitor.type.toUpperCase()}
+                      </span>
+                    </div>
+                    {monitor.description && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{monitor.description}</p>
+                    )}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{monitor.target}</p>
+                  </div>
+                  
+                  {/* Mini status graph - takes remaining space */}
+                  <div className="flex-1 min-w-0">
+                    <MiniStatusGraph history={monitor.history} />
+                  </div>
+                  
+                  {/* Status and uptime */}
+                  <div className="text-right shrink-0 w-24">
+                    <p className={`font-medium ${statusColor(monitor.latest_status?.status)}`}>
+                      {monitor.latest_status?.status
+                        ? monitor.latest_status.status.charAt(0).toUpperCase() + monitor.latest_status.status.slice(1)
+                        : 'Unknown'}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{uptime.toFixed(1)}%</p>
+                  </div>
                 </div>
               );
             })}
