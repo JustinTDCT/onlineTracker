@@ -1,5 +1,6 @@
 """Settings API endpoints."""
-from fastapi import APIRouter, Depends
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +8,7 @@ from ..database import get_db
 from ..models import Setting
 from ..models.settings import DEFAULT_SETTINGS
 from ..schemas.settings import SettingsResponse, SettingsUpdate
+from ..services.email_sender import email_sender_service, EmailConfig
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -99,3 +101,62 @@ async def update_settings(update: SettingsUpdate, db: AsyncSession = Depends(get
     # Return updated settings
     settings_dict = await get_all_settings(db)
     return _build_settings_response(settings_dict)
+
+
+@router.post("/test-email")
+async def test_email(db: AsyncSession = Depends(get_db)):
+    """Send a test email to verify SMTP configuration."""
+    settings_dict = await get_all_settings(db)
+    
+    # Check if email is enabled
+    if not _bool_from_str(settings_dict.get("email_alerts_enabled", "0")):
+        raise HTTPException(status_code=400, detail="Email alerts are not enabled")
+    
+    # Check required fields
+    smtp_host = settings_dict.get("smtp_host")
+    alert_email_to = settings_dict.get("alert_email_to")
+    
+    if not smtp_host:
+        raise HTTPException(status_code=400, detail="SMTP host is not configured")
+    if not alert_email_to:
+        raise HTTPException(status_code=400, detail="Alert email (To) is not configured")
+    
+    # Build config
+    config = EmailConfig(
+        host=smtp_host,
+        port=int(settings_dict.get("smtp_port", 587)),
+        username=settings_dict.get("smtp_username", ""),
+        password=settings_dict.get("smtp_password", ""),
+        use_tls=_bool_from_str(settings_dict.get("smtp_use_tls", "1")),
+        from_address=settings_dict.get("alert_email_from", ""),
+        to_address=alert_email_to,
+    )
+    
+    # Build test email
+    subject = "OnlineTracker - Test Email"
+    body = f"""OnlineTracker Test Email
+========================================
+
+This is a test email from OnlineTracker.
+
+If you received this message, your SMTP configuration is working correctly.
+
+SMTP Host: {config.host}
+SMTP Port: {config.port}
+TLS Enabled: {config.use_tls}
+From: {config.from_address or config.username or 'Not set'}
+To: {config.to_address}
+
+Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+--
+OnlineTracker Monitoring System
+"""
+    
+    # Send
+    success = await email_sender_service.send_email(config, subject, body)
+    
+    if success:
+        return {"success": True, "message": f"Test email sent to {alert_email_to}"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send test email. Check server logs for details.")
