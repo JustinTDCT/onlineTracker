@@ -90,6 +90,7 @@ async def create_monitor(monitor: MonitorCreate, db: AsyncSession = Depends(get_
         config=config_json,
         check_interval=monitor.check_interval,
         enabled=1 if monitor.enabled else 0,
+        agent_id=monitor.agent_id if monitor.agent_id else None,
     )
     db.add(db_monitor)
     await db.commit()
@@ -180,6 +181,9 @@ async def update_monitor(
         monitor.check_interval = update.check_interval
     if update.enabled is not None:
         monitor.enabled = 1 if update.enabled else 0
+    if update.agent_id is not None:
+        # Empty string means unassign from agent (server-side monitoring)
+        monitor.agent_id = update.agent_id if update.agent_id else None
     
     await db.commit()
     await db.refresh(monitor)

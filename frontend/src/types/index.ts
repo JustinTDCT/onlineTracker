@@ -35,6 +35,7 @@ export interface MonitorCreate {
   config?: MonitorConfig;
   check_interval?: number;
   enabled?: boolean;
+  agent_id?: string;  // Assign to agent, or undefined/empty for server-side monitoring
 }
 
 export interface StatusHistoryPoint {

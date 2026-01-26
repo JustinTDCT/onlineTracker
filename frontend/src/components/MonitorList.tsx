@@ -16,11 +16,13 @@ import {
   deleteMonitor,
   testMonitor,
   pollPage,
+  getAgents,
 } from '../api/client';
-import type { Monitor, MonitorCreate, MonitorTestResult } from '../types';
+import type { Monitor, MonitorCreate, MonitorTestResult, Agent } from '../types';
 
 export default function MonitorList() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null);
@@ -28,8 +30,25 @@ export default function MonitorList() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadMonitors();
+    loadData();
   }, []);
+
+  async function loadData() {
+    try {
+      const [monitorsData, agentsData] = await Promise.all([
+        getMonitors(),
+        getAgents(),
+      ]);
+      setMonitors(monitorsData);
+      // Only show approved agents
+      setAgents(agentsData.filter(a => a.status === 'approved'));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function loadMonitors() {
     try {
@@ -38,9 +57,13 @@ export default function MonitorList() {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load monitors');
-    } finally {
-      setLoading(false);
     }
+  }
+
+  function getAgentName(agentId?: string): string {
+    if (!agentId) return 'Server';
+    const agent = agents.find(a => a.id === agentId);
+    return agent?.name || agentId.slice(0, 8) + '...';
   }
 
   async function handleTest(monitor: Monitor) {
@@ -108,6 +131,7 @@ export default function MonitorList() {
       {showForm && (
         <MonitorForm
           monitor={editingMonitor}
+          agents={agents}
           onClose={() => {
             setShowForm(false);
             setEditingMonitor(null);
@@ -138,6 +162,7 @@ export default function MonitorList() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Target</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Agent</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Interval</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Response</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
@@ -146,7 +171,7 @@ export default function MonitorList() {
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {monitors.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                   No monitors configured. Click "Add Monitor" to create one.
                 </td>
               </tr>
@@ -172,6 +197,15 @@ export default function MonitorList() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
                     {monitor.target}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-medium rounded ${
+                      monitor.agent_id 
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' 
+                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    }`}>
+                      {getAgentName(monitor.agent_id)}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {monitor.check_interval}s
@@ -260,11 +294,12 @@ export default function MonitorList() {
 // Monitor form component
 interface FormProps {
   monitor: Monitor | null;
+  agents: Agent[];
   onClose: () => void;
   onSave: (data: MonitorCreate) => Promise<void>;
 }
 
-function MonitorForm({ monitor, onClose, onSave }: FormProps) {
+function MonitorForm({ monitor, agents, onClose, onSave }: FormProps) {
   const [type, setType] = useState<'ping' | 'http' | 'https' | 'ssl'>(
     monitor?.type || 'ping'
   );
@@ -273,6 +308,7 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
   const [target, setTarget] = useState(monitor?.target || '');
   const [interval, setInterval] = useState(monitor?.check_interval || 60);
   const [enabled, setEnabled] = useState(monitor?.enabled ?? true);
+  const [agentId, setAgentId] = useState(monitor?.agent_id || '');
   const [expectedStatus, setExpectedStatus] = useState(
     monitor?.config?.expected_status?.toString() || ''
   );
@@ -325,6 +361,7 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
       target,
       check_interval: interval,
       enabled,
+      agent_id: agentId || undefined,
       config: Object.keys(config).length > 0 ? config : undefined,
     });
     
@@ -406,6 +443,27 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
               min={10}
               max={3600}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Run From
+            </label>
+            <select
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+            >
+              <option value="">Server (local)</option>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name || agent.id.slice(0, 8) + '...'} (Agent)
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Choose where this monitor runs from. Use agents to check from remote locations.
+            </p>
           </div>
 
           {(type === 'http' || type === 'https') && (

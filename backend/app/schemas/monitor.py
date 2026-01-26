@@ -21,6 +21,7 @@ class MonitorCreate(BaseModel):
     config: Optional[MonitorConfig] = None
     check_interval: int = Field(default=60, ge=10, le=3600)
     enabled: bool = True
+    agent_id: Optional[str] = None  # Assign to agent, or None for server-side monitoring
 
 
 class MonitorUpdate(BaseModel):
@@ -31,6 +32,7 @@ class MonitorUpdate(BaseModel):
     config: Optional[MonitorConfig] = None
     check_interval: Optional[int] = Field(None, ge=10, le=3600)
     enabled: Optional[bool] = None
+    agent_id: Optional[str] = None  # Change agent assignment (empty string to unassign)
 
 
 class MonitorResponse(BaseModel):
