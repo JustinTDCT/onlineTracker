@@ -97,7 +97,8 @@ class CheckerService:
         try:
             start = datetime.now()
             
-            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            # Disable SSL verification to handle self-signed certificates
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=False) as client:
                 response = await client.get(target)
             
             response_time = int((datetime.now() - start).total_seconds() * 1000)
