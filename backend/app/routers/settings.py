@@ -36,6 +36,8 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
         check_interval_seconds=int(settings_dict.get("check_interval_seconds", 60)),
         ssl_warn_days=settings_dict.get("ssl_warn_days", "30,14,7"),
         webhook_url=settings_dict.get("webhook_url") or None,
+        shared_secret=settings_dict.get("shared_secret") or None,
+        allowed_agent_uuids=settings_dict.get("allowed_agent_uuids") or None,
     )
 
 
@@ -66,4 +68,6 @@ async def update_settings(update: SettingsUpdate, db: AsyncSession = Depends(get
         check_interval_seconds=int(settings_dict.get("check_interval_seconds", 60)),
         ssl_warn_days=settings_dict.get("ssl_warn_days", "30,14,7"),
         webhook_url=settings_dict.get("webhook_url") or None,
+        shared_secret=settings_dict.get("shared_secret") or None,
+        allowed_agent_uuids=settings_dict.get("allowed_agent_uuids") or None,
     )

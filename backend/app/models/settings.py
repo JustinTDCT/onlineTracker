@@ -21,4 +21,6 @@ DEFAULT_SETTINGS = {
     "check_interval_seconds": "60",
     "ssl_warn_days": "30,14,7",
     "webhook_url": "",
+    "shared_secret": "",
+    "allowed_agent_uuids": "",  # Comma-separated list of allowed agent UUIDs
 }

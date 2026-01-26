@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, X } from 'lucide-react';
+import { Save, X, Eye, EyeOff } from 'lucide-react';
 import { getSettings, updateSettings } from '../api/client';
 
 export default function SettingsPage() {
@@ -13,6 +13,9 @@ export default function SettingsPage() {
   const [checkInterval, setCheckInterval] = useState(60);
   const [sslWarnDays, setSslWarnDays] = useState('30,14,7');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [sharedSecret, setSharedSecret] = useState('');
+  const [allowedAgentUuids, setAllowedAgentUuids] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -25,6 +28,8 @@ export default function SettingsPage() {
       setCheckInterval(data.check_interval_seconds);
       setSslWarnDays(data.ssl_warn_days);
       setWebhookUrl(data.webhook_url || '');
+      setSharedSecret(data.shared_secret || '');
+      setAllowedAgentUuids(data.allowed_agent_uuids || '');
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings');
@@ -45,6 +50,8 @@ export default function SettingsPage() {
         check_interval_seconds: checkInterval,
         ssl_warn_days: sslWarnDays,
         webhook_url: webhookUrl || undefined,
+        shared_secret: sharedSecret || undefined,
+        allowed_agent_uuids: allowedAgentUuids || undefined,
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -138,6 +145,57 @@ export default function SettingsPage() {
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Consider agent offline after this many minutes without reporting
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Shared Secret
+            </label>
+            <div className="relative">
+              <input
+                type={showSecret ? 'text' : 'password'}
+                value={sharedSecret}
+                onChange={(e) => setSharedSecret(e.target.value)}
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 pr-10"
+                placeholder="Enter a secure shared secret"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret(!showSecret)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Agents must know this secret to register. Set SHARED_SECRET env var on agents.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Allowed Agent UUIDs
+            </label>
+            <textarea
+              value={allowedAgentUuids}
+              onChange={(e) => setAllowedAgentUuids(e.target.value)}
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+              rows={3}
+              placeholder="uuid-1, uuid-2, uuid-3"
+            />
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Comma-separated list of agent UUIDs allowed to register. Find the UUID in agent logs on first startup.
+            </p>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Agent Setup Steps</h3>
+            <ol className="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1">
+              <li>Set a shared secret above and save</li>
+              <li>Start the agent container - it will log its UUID</li>
+              <li>Copy the UUID and add it to the allowed list above</li>
+              <li>Save settings - the agent will auto-register on next attempt</li>
+            </ol>
           </div>
         </div>
 

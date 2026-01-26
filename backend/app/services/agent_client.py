@@ -34,6 +34,7 @@ class AgentClientService:
         uuid_file = Path(settings.data_path) / "agent_uuid"
         if uuid_file.exists():
             self._agent_uuid = uuid_file.read_text().strip()
+            logger.info(f"Loaded existing agent UUID: {self._agent_uuid}")
         else:
             # Generate new UUID
             self._agent_uuid = str(uuid.uuid4())
@@ -42,6 +43,20 @@ class AgentClientService:
             logger.info(f"Generated new agent UUID: {self._agent_uuid}")
         
         return self._agent_uuid
+    
+    def log_uuid_banner(self):
+        """Log the agent UUID prominently for easy copying."""
+        banner = f"""
+================================================================================
+  AGENT UUID: {self.agent_uuid}
+  
+  Add this UUID to the allowed agents list in your OnlineTracker server settings
+  before this agent can register and start monitoring.
+================================================================================
+"""
+        logger.info(banner)
+        # Also print to stdout for container logs
+        print(banner)
     
     @property
     def server_url(self) -> str:
@@ -74,10 +89,13 @@ class AgentClientService:
                 )
                 
                 if response.status_code == 202:
-                    logger.info("Agent registered, pending approval")
+                    data = response.json()
+                    msg = data.get("message", "registered")
+                    logger.info(f"Agent registered: {msg}")
                     return True
                 elif response.status_code == 200:
-                    logger.info("Agent already registered")
+                    data = response.json()
+                    logger.info(f"Agent already registered: {data.get('status', 'ok')}")
                     return True
                 else:
                     logger.error(f"Registration failed: {response.status_code} - {response.text}")
@@ -136,6 +154,9 @@ class AgentClientService:
         """Main agent loop - register, get monitors, run checks, report."""
         self._running = True
         logger.info("Starting agent client service")
+        
+        # Log UUID prominently for admin to copy
+        self.log_uuid_banner()
         
         # Initial registration
         while self._running and not self._registered:

@@ -1,5 +1,6 @@
 """Agent management API endpoints."""
 import hashlib
+import logging
 from datetime import datetime
 from typing import List
 
@@ -8,15 +9,56 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Agent, Monitor, MonitorStatus
+from ..models import Agent, Monitor, MonitorStatus, Setting
+from ..models.settings import DEFAULT_SETTINGS
 from ..schemas.agent import AgentRegister, AgentResponse, AgentApproval, AgentReport
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
+
+
+async def get_setting_value(db: AsyncSession, key: str) -> str:
+    """Get a setting value from the database."""
+    result = await db.execute(select(Setting).where(Setting.key == key))
+    setting = result.scalar_one_or_none()
+    if setting:
+        return setting.value
+    return DEFAULT_SETTINGS.get(key, "")
 
 
 @router.post("/register", status_code=202)
 async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)):
-    """Register a new agent (or return existing if already registered)."""
+    """Register a new agent (or return existing if already registered).
+    
+    Two-layer authentication:
+    1. UUID must be in allowed_agent_uuids list
+    2. Secret hash must match server's shared_secret hash
+    """
+    # Get server settings for auth
+    allowed_uuids_str = await get_setting_value(db, "allowed_agent_uuids")
+    server_secret = await get_setting_value(db, "shared_secret")
+    
+    # Check if UUID is in allowed list
+    if allowed_uuids_str:
+        allowed_uuids = [u.strip() for u in allowed_uuids_str.split(",") if u.strip()]
+        if data.uuid not in allowed_uuids:
+            logger.warning(f"Agent registration rejected - UUID not in allowed list: {data.uuid}")
+            raise HTTPException(status_code=403, detail="Agent UUID not authorized")
+    else:
+        # No allowed list configured - reject all new registrations
+        logger.warning(f"Agent registration rejected - no allowed UUIDs configured: {data.uuid}")
+        raise HTTPException(status_code=403, detail="No agents are authorized. Add UUID to allowed list in Settings.")
+    
+    # Verify secret hash against server's shared_secret
+    if not server_secret:
+        logger.warning("Agent registration rejected - no shared secret configured")
+        raise HTTPException(status_code=403, detail="Shared secret not configured on server")
+    
+    expected_hash = hashlib.sha256(server_secret.encode()).hexdigest()
+    if data.secret_hash != expected_hash:
+        logger.warning(f"Agent registration rejected - invalid secret for UUID: {data.uuid}")
+        raise HTTPException(status_code=403, detail="Invalid shared secret")
+    
     # Check if agent already exists
     result = await db.execute(select(Agent).where(Agent.id == data.uuid))
     existing = result.scalar_one_or_none()
@@ -27,16 +69,17 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
             raise HTTPException(status_code=403, detail="Invalid credentials")
         return {"status": "already_registered", "approved": existing.status}
     
-    # Create new agent
+    # Create new agent - auto-approve since it passed both auth checks
     agent = Agent(
         id=data.uuid,
         secret_hash=data.secret_hash,
-        approved=0,  # Pending approval
+        approved=1,  # Auto-approved (passed UUID allowlist and secret check)
     )
     db.add(agent)
     await db.commit()
     
-    return {"status": "registered", "message": "Pending approval"}
+    logger.info(f"Agent registered and auto-approved: {data.uuid}")
+    return {"status": "registered", "message": "Approved"}
 
 
 @router.get("", response_model=List[AgentResponse])

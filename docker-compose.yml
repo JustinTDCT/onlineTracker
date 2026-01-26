@@ -1,5 +1,5 @@
-# OnlineTracker Docker Compose Example
-# Demonstrates server and agent deployment
+# OnlineTracker Docker Compose
+# Server and agent deployment
 
 services:
   # Main server instance
@@ -17,22 +17,22 @@ services:
       - onlinetracker-data:/data
     restart: unless-stopped
 
-  # Example agent instance (optional)
-  # Uncomment to test agent mode
-  # onlinetracker-agent:
-  #   build: .
-  #   container_name: onlinetracker-agent
-  #   environment:
-  #     - MODE=agent
-  #     - SERVER_HOST=onlinetracker-server
-  #     - COMS_PORT=19443
-  #     - SHARED_SECRET=your-secret-here  # Change this!
-  #   volumes:
-  #     - onlinetracker-agent-data:/data
-  #   depends_on:
-  #     - onlinetracker-server
-  #   restart: unless-stopped
+  # Test agent instance
+  # To use: set shared secret and allowed UUIDs in Settings first
+  onlinetracker-agent:
+    build: .
+    container_name: onlinetracker-agent
+    environment:
+      - MODE=agent
+      - SERVER_HOST=onlinetracker-server
+      - COMS_PORT=8000
+      - SHARED_SECRET=test-secret-change-me
+    volumes:
+      - onlinetracker-agent-data:/data
+    depends_on:
+      - onlinetracker-server
+    restart: unless-stopped
 
 volumes:
   onlinetracker-data:
-  # onlinetracker-agent-data:
+  onlinetracker-agent-data:

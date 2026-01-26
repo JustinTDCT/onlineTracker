@@ -76,6 +76,8 @@ export interface Settings {
   check_interval_seconds: number;
   ssl_warn_days: string;
   webhook_url?: string;
+  shared_secret?: string;
+  allowed_agent_uuids?: string;
 }
 
 // Status overview

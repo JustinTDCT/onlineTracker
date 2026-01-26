@@ -87,7 +87,13 @@ Agents run on remote servers and report results back to the central server.
 
 ### Setting up an Agent
 
-1. Deploy the agent container:
+**Step 1: Configure the server**
+1. Open the web UI at `http://localhost:8000`
+2. Go to Settings > Agents
+3. Set a **Shared Secret** (agents must know this to connect)
+4. Save settings
+
+**Step 2: Deploy the agent**
 
 ```bash
 docker run -d \
@@ -100,15 +106,33 @@ docker run -d \
   onlinetracker
 ```
 
-2. The agent generates a UUID on first start
-3. In the server UI, go to "Agents" and approve the new agent
-4. Assign monitors to the agent
+**Step 3: Authorize the agent**
+1. Check the agent container logs - the UUID is displayed prominently:
+   ```
+   docker logs onlinetracker-agent
+   ```
+2. Copy the UUID from the banner
+3. In the server UI, go to Settings > Agents
+4. Add the UUID to the **Allowed Agent UUIDs** list
+5. Save settings
+
+The agent will automatically register and be approved on its next attempt.
+
+**Step 4: Assign monitors**
+1. Create or edit a monitor
+2. Assign it to the agent
+3. The agent will start running checks within 30 seconds
 
 ### Agent Security
 
-- Agents authenticate using a shared secret
-- Agents must be approved in the server UI before reporting results
-- Each agent has a unique UUID for identification
+OnlineTracker uses **two-layer authentication** for agents:
+
+1. **Allowed UUIDs**: Pre-authorize which agent UUIDs can register
+2. **Shared Secret**: Agents must know the correct password
+
+Both checks must pass for an agent to register. This prevents:
+- Unknown agents from connecting (UUID check)
+- Spoofed UUIDs without the secret (password check)
 
 ## API Endpoints
 
