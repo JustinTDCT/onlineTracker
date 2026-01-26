@@ -9,9 +9,9 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Agent, Monitor, MonitorStatus, Setting
+from ..models import Agent, Monitor, MonitorStatus, Setting, PendingAgent
 from ..models.settings import DEFAULT_SETTINGS
-from ..schemas.agent import AgentRegister, AgentResponse, AgentApproval, AgentReport
+from ..schemas.agent import AgentRegister, AgentResponse, AgentApproval, AgentReport, PendingAgentResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -26,6 +26,29 @@ async def get_setting_value(db: AsyncSession, key: str) -> str:
     return DEFAULT_SETTINGS.get(key, "")
 
 
+async def store_pending_agent(db: AsyncSession, uuid: str, name: str | None, secret_hash: str):
+    """Store or update a pending agent registration attempt."""
+    result = await db.execute(select(PendingAgent).where(PendingAgent.uuid == uuid))
+    existing = result.scalar_one_or_none()
+    
+    if existing:
+        # Update existing pending agent
+        existing.last_attempt = datetime.utcnow()
+        existing.attempt_count += 1
+        if name:
+            existing.name = name
+    else:
+        # Create new pending agent
+        pending = PendingAgent(
+            uuid=uuid,
+            name=name,
+            secret_hash=secret_hash,
+        )
+        db.add(pending)
+    
+    await db.commit()
+
+
 @router.post("/register", status_code=202)
 async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)):
     """Register a new agent (or return existing if already registered).
@@ -33,23 +56,15 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
     Two-layer authentication:
     1. UUID must be in allowed_agent_uuids list
     2. Secret hash must match server's shared_secret hash
+    
+    If UUID is not in allowed list but secret is valid, the attempt is recorded
+    as a pending agent for the admin to approve via the UI.
     """
     # Get server settings for auth
     allowed_uuids_str = await get_setting_value(db, "allowed_agent_uuids")
     server_secret = await get_setting_value(db, "shared_secret")
     
-    # Check if UUID is in allowed list
-    if allowed_uuids_str:
-        allowed_uuids = [u.strip() for u in allowed_uuids_str.split(",") if u.strip()]
-        if data.uuid not in allowed_uuids:
-            logger.warning(f"Agent registration rejected - UUID not in allowed list: {data.uuid}")
-            raise HTTPException(status_code=403, detail="Agent UUID not authorized")
-    else:
-        # No allowed list configured - reject all new registrations
-        logger.warning(f"Agent registration rejected - no allowed UUIDs configured: {data.uuid}")
-        raise HTTPException(status_code=403, detail="No agents are authorized. Add UUID to allowed list in Settings.")
-    
-    # Verify secret hash against server's shared_secret
+    # Verify secret hash against server's shared_secret first
     if not server_secret:
         logger.warning("Agent registration rejected - no shared secret configured")
         raise HTTPException(status_code=403, detail="Shared secret not configured on server")
@@ -59,6 +74,20 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
         logger.warning(f"Agent registration rejected - invalid secret for UUID: {data.uuid}")
         raise HTTPException(status_code=403, detail="Invalid shared secret")
     
+    # Check if UUID is in allowed list
+    if allowed_uuids_str:
+        allowed_uuids = [u.strip() for u in allowed_uuids_str.split(",") if u.strip()]
+        if data.uuid not in allowed_uuids:
+            # Secret is valid but UUID not allowed - store as pending
+            logger.warning(f"Agent registration pending - UUID not in allowed list: {data.uuid}")
+            await store_pending_agent(db, data.uuid, data.name, data.secret_hash)
+            raise HTTPException(status_code=403, detail="Agent UUID not authorized. Request sent to admin for approval.")
+    else:
+        # No allowed list configured - store as pending if secret was valid
+        logger.warning(f"Agent registration pending - no allowed UUIDs configured: {data.uuid}")
+        await store_pending_agent(db, data.uuid, data.name, data.secret_hash)
+        raise HTTPException(status_code=403, detail="No agents are authorized. Request sent to admin for approval.")
+    
     # Check if agent already exists
     result = await db.execute(select(Agent).where(Agent.id == data.uuid))
     existing = result.scalar_one_or_none()
@@ -67,6 +96,12 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
         # Verify secret hash matches
         if existing.secret_hash != data.secret_hash:
             raise HTTPException(status_code=403, detail="Invalid credentials")
+        # Remove from pending if exists
+        await db.execute(select(PendingAgent).where(PendingAgent.uuid == data.uuid))
+        pending = (await db.execute(select(PendingAgent).where(PendingAgent.uuid == data.uuid))).scalar_one_or_none()
+        if pending:
+            await db.delete(pending)
+            await db.commit()
         return {"status": "already_registered", "approved": existing.status}
     
     # Create new agent - auto-approve since it passed both auth checks
@@ -77,6 +112,12 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
         approved=1,  # Auto-approved (passed UUID allowlist and secret check)
     )
     db.add(agent)
+    
+    # Remove from pending if exists
+    pending = (await db.execute(select(PendingAgent).where(PendingAgent.uuid == data.uuid))).scalar_one_or_none()
+    if pending:
+        await db.delete(pending)
+    
     await db.commit()
     
     agent_display = data.name or data.uuid[:8]
@@ -108,6 +149,78 @@ async def list_agents(db: AsyncSession = Depends(get_db)):
         ))
     
     return response
+
+
+@router.get("/pending", response_model=List[PendingAgentResponse])
+async def list_pending_agents(db: AsyncSession = Depends(get_db)):
+    """List all pending agent registration requests.
+    
+    These are agents that tried to connect with the correct shared secret
+    but their UUID was not in the allowed list.
+    """
+    result = await db.execute(select(PendingAgent).order_by(PendingAgent.last_attempt.desc()))
+    pending = result.scalars().all()
+    return pending
+
+
+@router.post("/pending/{uuid}/approve")
+async def approve_pending_agent(uuid: str, db: AsyncSession = Depends(get_db)):
+    """Approve a pending agent by adding its UUID to the allowed list.
+    
+    The agent will be able to register on its next connection attempt.
+    """
+    # Check if pending agent exists
+    result = await db.execute(select(PendingAgent).where(PendingAgent.uuid == uuid))
+    pending = result.scalar_one_or_none()
+    
+    if not pending:
+        raise HTTPException(status_code=404, detail="Pending agent not found")
+    
+    # Get current allowed UUIDs
+    allowed_uuids_str = await get_setting_value(db, "allowed_agent_uuids")
+    
+    # Add UUID to allowed list
+    if allowed_uuids_str:
+        allowed_uuids = [u.strip() for u in allowed_uuids_str.split(",") if u.strip()]
+        if uuid not in allowed_uuids:
+            allowed_uuids.append(uuid)
+            new_allowed_str = ",".join(allowed_uuids)
+        else:
+            new_allowed_str = allowed_uuids_str
+    else:
+        new_allowed_str = uuid
+    
+    # Update setting
+    setting_result = await db.execute(select(Setting).where(Setting.key == "allowed_agent_uuids"))
+    setting = setting_result.scalar_one_or_none()
+    
+    if setting:
+        setting.value = new_allowed_str
+    else:
+        setting = Setting(key="allowed_agent_uuids", value=new_allowed_str)
+        db.add(setting)
+    
+    # Remove from pending
+    await db.delete(pending)
+    await db.commit()
+    
+    logger.info(f"Pending agent approved and added to allowed list: {uuid}")
+    return {"status": "approved", "uuid": uuid, "message": "Agent will register on next connection attempt"}
+
+
+@router.delete("/pending/{uuid}", status_code=204)
+async def dismiss_pending_agent(uuid: str, db: AsyncSession = Depends(get_db)):
+    """Dismiss/delete a pending agent registration request."""
+    result = await db.execute(select(PendingAgent).where(PendingAgent.uuid == uuid))
+    pending = result.scalar_one_or_none()
+    
+    if not pending:
+        raise HTTPException(status_code=404, detail="Pending agent not found")
+    
+    await db.delete(pending)
+    await db.commit()
+    
+    logger.info(f"Pending agent dismissed: {uuid}")
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)

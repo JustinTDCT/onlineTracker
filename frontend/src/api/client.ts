@@ -4,6 +4,7 @@ import type {
   MonitorTestResult,
   StatusHistoryPoint,
   Agent,
+  PendingAgent,
   Settings,
   StatusOverview,
   PollPageResult,
@@ -102,6 +103,23 @@ export async function approveAgent(
 
 export async function deleteAgent(id: string): Promise<void> {
   return fetchJson(`${API_BASE}/agents/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+// Pending Agents
+export async function getPendingAgents(): Promise<PendingAgent[]> {
+  return fetchJson(`${API_BASE}/agents/pending`);
+}
+
+export async function approvePendingAgent(uuid: string): Promise<void> {
+  return fetchJson(`${API_BASE}/agents/pending/${uuid}/approve`, {
+    method: 'POST',
+  });
+}
+
+export async function dismissPendingAgent(uuid: string): Promise<void> {
+  return fetchJson(`${API_BASE}/agents/pending/${uuid}`, {
     method: 'DELETE',
   });
 }

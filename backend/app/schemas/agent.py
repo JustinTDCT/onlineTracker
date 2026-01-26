@@ -30,6 +30,18 @@ class AgentApproval(BaseModel):
     name: Optional[str] = None  # Optional friendly name
 
 
+class PendingAgentResponse(BaseModel):
+    """Schema for pending agent in API responses."""
+    uuid: str
+    name: Optional[str] = None
+    first_attempt: datetime
+    last_attempt: datetime
+    attempt_count: int
+    
+    class Config:
+        from_attributes = True
+
+
 class CheckResult(BaseModel):
     """Result of a single check from an agent."""
     monitor_id: int

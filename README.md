@@ -107,16 +107,19 @@ docker run -d \
 ```
 
 **Step 3: Authorize the agent**
-1. Check the agent container logs - the UUID is displayed prominently:
-   ```
-   docker logs onlinetracker-agent
-   ```
-2. Copy the UUID from the banner
-3. In the server UI, go to Settings > Agents
-4. Add the UUID to the **Allowed Agent UUIDs** list
-5. Save settings
 
-The agent will automatically register and be approved on its next attempt.
+The agent will attempt to connect and appear in the "Pending Connection Requests" list:
+
+1. In the server UI, go to Settings > Agents
+2. Expand **Pending Connection Requests** 
+3. Click **Approve** next to the agent's UUID
+
+The UUID will be added to the allowed list and the agent will register on its next attempt.
+
+Alternatively, manually add the UUID:
+1. Check the agent container logs: `docker logs onlinetracker-agent`
+2. Copy the UUID from the banner
+3. Add it to the **Allowed Agent UUIDs** list and save
 
 **Step 4: Assign monitors**
 1. Create or edit a monitor
@@ -149,6 +152,9 @@ Both checks must pass for an agent to register. This prevents:
 - `GET /api/agents` - List agents
 - `PUT /api/agents/{id}/approve` - Approve/reject agent
 - `DELETE /api/agents/{id}` - Delete agent
+- `GET /api/agents/pending` - List pending connection requests
+- `POST /api/agents/pending/{uuid}/approve` - Approve pending agent
+- `DELETE /api/agents/pending/{uuid}` - Dismiss pending agent
 
 ### Settings
 - `GET /api/settings` - Get settings

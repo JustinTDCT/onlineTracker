@@ -72,6 +72,14 @@ export interface Agent {
   monitor_count: number;
 }
 
+export interface PendingAgent {
+  uuid: string;
+  name?: string;
+  first_attempt: string;
+  last_attempt: string;
+  attempt_count: number;
+}
+
 // Settings types
 export interface Settings {
   agent_timeout_minutes: number;

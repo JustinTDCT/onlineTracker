@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Save, X, Eye, EyeOff } from 'lucide-react';
-import { getSettings, updateSettings } from '../api/client';
+import { Save, X, Eye, EyeOff, UserPlus, UserX, Clock, RefreshCw } from 'lucide-react';
+import { getSettings, updateSettings, getPendingAgents, approvePendingAgent, dismissPendingAgent } from '../api/client';
+import type { PendingAgent } from '../types';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -16,9 +17,15 @@ export default function SettingsPage() {
   const [sharedSecret, setSharedSecret] = useState('');
   const [allowedAgentUuids, setAllowedAgentUuids] = useState('');
   const [showSecret, setShowSecret] = useState(false);
+  
+  // Pending agents state
+  const [pendingAgents, setPendingAgents] = useState<PendingAgent[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [showPendingAgents, setShowPendingAgents] = useState(false);
 
   useEffect(() => {
     loadSettings();
+    loadPendingAgents();
   }, []);
 
   async function loadSettings() {
@@ -36,6 +43,53 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
+  }
+  
+  async function loadPendingAgents() {
+    setLoadingPending(true);
+    try {
+      const data = await getPendingAgents();
+      setPendingAgents(data);
+    } catch (err) {
+      console.error('Failed to load pending agents:', err);
+    } finally {
+      setLoadingPending(false);
+    }
+  }
+  
+  async function handleApprovePending(uuid: string) {
+    try {
+      await approvePendingAgent(uuid);
+      // Reload both pending agents and settings (allowed UUIDs changed)
+      await Promise.all([loadPendingAgents(), loadSettings()]);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve agent');
+    }
+  }
+  
+  async function handleDismissPending(uuid: string) {
+    try {
+      await dismissPendingAgent(uuid);
+      await loadPendingAgents();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to dismiss agent');
+    }
+  }
+  
+  function formatTimeAgo(dateStr: string): string {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -188,13 +242,93 @@ export default function SettingsPage() {
             </p>
           </div>
 
+          {/* Pending Agents Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <button
+                type="button"
+                onClick={() => setShowPendingAgents(!showPendingAgents)}
+                className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+              >
+                <Clock className="h-4 w-4" />
+                Pending Connection Requests
+                {pendingAgents.length > 0 && (
+                  <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full text-xs font-medium">
+                    {pendingAgents.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={loadPendingAgents}
+                disabled={loadingPending}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                title="Refresh pending requests"
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingPending ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            
+            {showPendingAgents && (
+              <div className="space-y-2">
+                {pendingAgents.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                    No pending requests. Agents with valid secrets but unknown UUIDs will appear here.
+                  </p>
+                ) : (
+                  pendingAgents.map((agent) => (
+                    <div
+                      key={agent.uuid}
+                      className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-gray-900 dark:text-white truncate">
+                            {agent.uuid}
+                          </span>
+                          {agent.name && (
+                            <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">
+                              {agent.name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {agent.attempt_count} attempt{agent.attempt_count !== 1 ? 's' : ''} · Last: {formatTimeAgo(agent.last_attempt)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-3">
+                        <button
+                          type="button"
+                          onClick={() => handleApprovePending(agent.uuid)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                          title="Approve and add to allowed list"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDismissPending(agent.uuid)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                          title="Dismiss request"
+                        >
+                          <UserX className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Agent Setup Steps</h3>
             <ol className="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1">
               <li>Set a shared secret above and save</li>
               <li>Start the agent container - it will log its UUID</li>
-              <li>Copy the UUID and add it to the allowed list above</li>
-              <li>Save settings - the agent will auto-register on next attempt</li>
+              <li>The agent will appear in "Pending Connection Requests" above</li>
+              <li>Click Approve to allow the agent to register</li>
             </ol>
           </div>
         </div>
