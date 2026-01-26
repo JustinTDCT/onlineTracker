@@ -10,6 +10,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from 'lucide-react';
 import {
   getMonitors,
@@ -32,19 +33,31 @@ export default function MonitorList() {
   const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; result: MonitorTestResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Filter monitors based on search query
+  const filteredMonitors = useMemo(() => {
+    if (!searchQuery.trim()) return monitors;
+    const query = searchQuery.toLowerCase().trim();
+    return monitors.filter(m => 
+      m.name.toLowerCase().includes(query) ||
+      (m.description && m.description.toLowerCase().includes(query)) ||
+      m.target.toLowerCase().includes(query)
+    );
+  }, [monitors, searchQuery]);
+
   // Pagination calculations
-  const totalPages = useMemo(() => Math.ceil(monitors.length / pageSize), [monitors.length, pageSize]);
+  const totalPages = useMemo(() => Math.ceil(filteredMonitors.length / pageSize), [filteredMonitors.length, pageSize]);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedMonitors = useMemo(() => monitors.slice(startIndex, endIndex), [monitors, startIndex, endIndex]);
+  const paginatedMonitors = useMemo(() => filteredMonitors.slice(startIndex, endIndex), [filteredMonitors, startIndex, endIndex]);
 
-  // Reset to page 1 when page size changes
+  // Reset to page 1 when filter or page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [pageSize]);
+  }, [searchQuery, pageSize]);
 
   useEffect(() => {
     loadData();
@@ -124,16 +137,28 @@ export default function MonitorList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Monitors</h1>
-        <button
-          onClick={() => {
-            setEditingMonitor(null);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Monitor
-        </button>
+        <div className="flex items-center gap-4">
+          <div className="search-wrapper">
+            <Search className="search-icon" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search monitors..."
+              className="search-input w-64"
+            />
+          </div>
+          <button
+            onClick={() => {
+              setEditingMonitor(null);
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Monitor
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -186,10 +211,12 @@ export default function MonitorList() {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {monitors.length === 0 ? (
+            {filteredMonitors.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                  No monitors configured. Click "Add Monitor" to create one.
+                  {monitors.length === 0 
+                    ? 'No monitors configured. Click "Add Monitor" to create one.'
+                    : 'No monitors match your search.'}
                 </td>
               </tr>
             ) : (
@@ -267,10 +294,10 @@ export default function MonitorList() {
         </table>
         
         {/* Pagination controls */}
-        {monitors.length > 0 && totalPages > 1 && (
+        {filteredMonitors.length > 0 && totalPages > 1 && (
           <div className="pagination">
             <div className="pagination-info">
-              Showing {startIndex + 1}-{Math.min(endIndex, monitors.length)} of {monitors.length}
+              Showing {startIndex + 1}-{Math.min(endIndex, filteredMonitors.length)} of {filteredMonitors.length}
             </div>
             <div className="pagination-controls">
               <select

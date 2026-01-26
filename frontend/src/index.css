@@ -39,3 +39,18 @@ body {
   @apply text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-2 py-1.5;
   @apply text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-indigo-500;
 }
+
+/* Search input styles */
+.search-input {
+  @apply text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg pl-9 pr-3 py-1.5;
+  @apply text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500;
+  @apply focus:ring-2 focus:ring-indigo-500 focus:outline-none;
+}
+
+.search-wrapper {
+  @apply relative;
+}
+
+.search-icon {
+  @apply absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400;
+}

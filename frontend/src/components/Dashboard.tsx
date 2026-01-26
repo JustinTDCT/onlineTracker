@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, HelpCircle, Server, TrendingUp } from 'lucide-react';
+import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, HelpCircle, Search, Server, TrendingUp } from 'lucide-react';
 import { getMonitors, getMonitorHistory, getAgents } from '../api/client';
 import type { Monitor, StatusHistoryPoint, Agent } from '../types';
 import MiniStatusGraph from './MiniStatusGraph';
@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<TimeRange>(TIME_RANGES[0]);
   const [selectedAgent, setSelectedAgent] = useState<string>('all'); // 'all', 'server', or agent_id
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -80,17 +81,34 @@ export default function Dashboard() {
     }
   }
 
-  // Filter monitors based on selected agent
+  // Filter monitors based on selected agent and search query
   const filteredMonitors = useMemo(() => {
-    if (selectedAgent === 'all') return monitors;
-    if (selectedAgent === 'server') return monitors.filter(m => !m.agent_id);
-    return monitors.filter(m => m.agent_id === selectedAgent);
-  }, [monitors, selectedAgent]);
+    let result = monitors;
+    
+    // Filter by agent
+    if (selectedAgent === 'server') {
+      result = result.filter(m => !m.agent_id);
+    } else if (selectedAgent !== 'all') {
+      result = result.filter(m => m.agent_id === selectedAgent);
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(m => 
+        m.name.toLowerCase().includes(query) ||
+        (m.description && m.description.toLowerCase().includes(query)) ||
+        m.target.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
+  }, [monitors, selectedAgent, searchQuery]);
 
   // Reset to page 1 when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedAgent, pageSize]);
+  }, [selectedAgent, searchQuery, pageSize]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredMonitors.length / pageSize);
@@ -230,6 +248,16 @@ export default function Dashboard() {
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">All Monitors</h2>
           <div className="flex items-center gap-4">
+            <div className="search-wrapper">
+              <Search className="search-icon" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search monitors..."
+                className="search-input w-48"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <Server className="h-4 w-4 text-gray-400" />
               <select
@@ -281,6 +309,8 @@ export default function Dashboard() {
                   Add one
                 </Link>
               </>
+            ) : searchQuery ? (
+              'No monitors match your search.'
             ) : (
               'No monitors match the selected filter.'
             )}
