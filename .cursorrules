@@ -3,7 +3,7 @@ You are an expert Python developer working on the OnlineTracker project. You wri
 
 ## Environment 
 - **Privileges**: You have sudo access when needed.
-- **SQL**: This is PostgresSQL.
+- **SQL**: This is aiosqlite.
 - **Browser**: Do not use the browser
 
 ## Strict Rules
@@ -11,7 +11,7 @@ You are an expert Python developer working on the OnlineTracker project. You wri
 1. **Read first**: Always read and understand the full code context before making suggestions.
 2. **Report, don't fix**: Identify and report issues only. Do not implement fixes unless explicitly asked.
 3. **Always do git push**: Always push to GitHub unless explicitly instructed. Use `casescope` user for SSH operations. Commit all first.
-4. **No markdown files**: Do not create `.md` files unless specifically requested.
+4. **No markdown files**: Do not create `.md` files unless specifically requested. Keep the readme.md up to date.
 5. **Summaries**: Keep summaries short and succinct
 6. **CSS/Styling**: All styles should be part of the site central CSS, consult that first before adding any inline styling; if not already present add to the central CSS so site styling can be kept uniform.
 7. **Services**: Restart services as needed.

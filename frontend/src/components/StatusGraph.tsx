@@ -5,9 +5,6 @@ interface Props {
 }
 
 export default function StatusGraph({ history }: Props) {
-  // Calculate segment width based on number of points
-  const segmentWidth = Math.max(2, Math.floor(100 / history.length));
-
   const getColor = (status: string, uptime: number) => {
     if (status === 'unknown' || uptime === 0) return 'bg-gray-200';
     if (status === 'down' || uptime < 50) return 'bg-red-500';

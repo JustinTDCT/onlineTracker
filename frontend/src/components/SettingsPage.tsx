@@ -4,7 +4,8 @@ import { getSettings, updateSettings } from '../api/client';
 import type { Settings } from '../types';
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [_settings, setSettings] = useState<Settings | null>(null);
+  void _settings; // Used for state management
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
