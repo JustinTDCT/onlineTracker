@@ -11,6 +11,7 @@ export interface LatestStatus {
   response_time_ms?: number;
   checked_at: string;
   details?: string;
+  ssl_expiry_days?: number;
 }
 
 export interface Monitor {

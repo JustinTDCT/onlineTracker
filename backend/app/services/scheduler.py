@@ -114,6 +114,7 @@ class SchedulerService:
                 status=check_result.status,
                 response_time_ms=check_result.response_time_ms,
                 details=check_result.details,
+                ssl_expiry_days=check_result.ssl_expiry_days,
             )
             session.add(new_status)
             

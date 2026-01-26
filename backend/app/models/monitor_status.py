@@ -17,6 +17,7 @@ class MonitorStatus(Base):
     status = Column(String, nullable=False)  # up, down, degraded, unknown
     response_time_ms = Column(Integer, nullable=True)
     details = Column(String, nullable=True)  # Error message or extra info
+    ssl_expiry_days = Column(Integer, nullable=True)  # Days until SSL cert expires
     
     # Relationship
     monitor = relationship("Monitor", back_populates="statuses")

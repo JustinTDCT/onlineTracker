@@ -68,6 +68,7 @@ async def list_monitors(db: AsyncSession = Depends(get_db)):
                 response_time_ms=latest.response_time_ms,
                 checked_at=latest.checked_at,
                 details=latest.details,
+                ssl_expiry_days=latest.ssl_expiry_days,
             ) if latest else None,
         )
         response.append(monitor_data)
@@ -151,6 +152,7 @@ async def get_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
             response_time_ms=latest.response_time_ms,
             checked_at=latest.checked_at,
             details=latest.details,
+            ssl_expiry_days=latest.ssl_expiry_days,
         ) if latest else None,
     )
 

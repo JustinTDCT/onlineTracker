@@ -58,6 +58,7 @@ class LatestStatus(BaseModel):
     response_time_ms: Optional[int] = None
     checked_at: datetime
     details: Optional[str] = None
+    ssl_expiry_days: Optional[int] = None
 
 
 class MonitorWithStatus(MonitorResponse):

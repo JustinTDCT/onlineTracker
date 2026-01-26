@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertCircle, CheckCircle, HelpCircle, TrendingUp } from 'lucide-react';
+import { Activity, AlertCircle, CheckCircle, Clock, HelpCircle, TrendingUp } from 'lucide-react';
 import { getMonitors, getMonitorHistory } from '../api/client';
 import type { Monitor, StatusHistoryPoint } from '../types';
 import MiniStatusGraph from './MiniStatusGraph';
@@ -205,6 +205,26 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{monitor.description}</p>
                     )}
                     <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{monitor.target}</p>
+                  </div>
+                  
+                  {/* Response column */}
+                  <div className="shrink-0 w-24 text-center">
+                    {monitor.type === 'ssl' ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {monitor.latest_status?.ssl_expiry_days !== undefined
+                            ? `${monitor.latest_status.ssl_expiry_days}d`
+                            : '-'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        {monitor.latest_status?.response_time_ms !== undefined
+                          ? `${monitor.latest_status.response_time_ms}ms`
+                          : '-'}
+                      </span>
+                    )}
                   </div>
                   
                   {/* Mini status graph - takes remaining space */}
