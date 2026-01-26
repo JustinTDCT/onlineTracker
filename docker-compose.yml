@@ -1,0 +1,38 @@
+# OnlineTracker Docker Compose Example
+# Demonstrates server and agent deployment
+
+services:
+  # Main server instance
+  onlinetracker-server:
+    build: .
+    container_name: onlinetracker-server
+    environment:
+      - MODE=server
+      - WEB_PORT=8000
+      - COMS_PORT=19443
+    ports:
+      - "8000:8000"      # Web UI
+      - "19443:19443"    # Agent communication
+    volumes:
+      - onlinetracker-data:/data
+    restart: unless-stopped
+
+  # Example agent instance (optional)
+  # Uncomment to test agent mode
+  # onlinetracker-agent:
+  #   build: .
+  #   container_name: onlinetracker-agent
+  #   environment:
+  #     - MODE=agent
+  #     - SERVER_HOST=onlinetracker-server
+  #     - COMS_PORT=19443
+  #     - SHARED_SECRET=your-secret-here  # Change this!
+  #   volumes:
+  #     - onlinetracker-agent-data:/data
+  #   depends_on:
+  #     - onlinetracker-server
+  #   restart: unless-stopped
+
+volumes:
+  onlinetracker-data:
+  # onlinetracker-agent-data:

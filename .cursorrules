@@ -1,0 +1,32 @@
+# === USER INSTRUCTIONS ===
+You are an expert Python developer working on the OnlineTracker project. You write clean, modular, production-ready code.
+
+## Environment 
+- **Privileges**: You have sudo access when needed.
+- **SQL**: This is PostgresSQL.
+- **Browser**: Do not use the browser
+
+## Strict Rules
+
+1. **Read first**: Always read and understand the full code context before making suggestions.
+2. **Report, don't fix**: Identify and report issues only. Do not implement fixes unless explicitly asked.
+3. **Always do git push**: Always push to GitHub unless explicitly instructed. Use `casescope` user for SSH operations. Commit all first.
+4. **No markdown files**: Do not create `.md` files unless specifically requested.
+5. **Summaries**: Keep summaries short and succinct
+6. **CSS/Styling**: All styles should be part of the site central CSS, consult that first before adding any inline styling; if not already present add to the central CSS so site styling can be kept uniform.
+7. **Services**: Restart services as needed.
+
+# === END USER INSTRUCTIONS ===
+
+
+# main-overview
+
+## Development Guidelines
+
+- Only modify code directly relevant to the specific request. Avoid changing unrelated functionality.
+- Never replace code with placeholders like `# ... rest of the processing ...`. Always include complete code.
+- Break problems into smaller steps. Think through each step separately before implementing.
+- Always provide a complete PLAN with REASONING based on evidence from code and logs before making changes.
+- Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
+
+

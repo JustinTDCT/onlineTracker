@@ -1,0 +1,315 @@
+"""Monitor CRUD API endpoints."""
+import json
+from datetime import datetime, timedelta
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..database import get_db
+from ..models import Monitor, MonitorStatus
+from ..schemas.monitor import (
+    MonitorCreate,
+    MonitorUpdate,
+    MonitorResponse,
+    MonitorWithStatus,
+    MonitorTestResponse,
+    StatusHistoryPoint,
+    LatestStatus,
+)
+from ..services.checker import checker_service
+
+router = APIRouter(prefix="/api/monitors", tags=["monitors"])
+
+
+@router.get("", response_model=List[MonitorWithStatus])
+async def list_monitors(db: AsyncSession = Depends(get_db)):
+    """List all monitors with their latest status."""
+    result = await db.execute(select(Monitor).order_by(Monitor.name))
+    monitors = result.scalars().all()
+    
+    response = []
+    for monitor in monitors:
+        # Get latest status
+        status_result = await db.execute(
+            select(MonitorStatus)
+            .where(MonitorStatus.monitor_id == monitor.id)
+            .order_by(MonitorStatus.checked_at.desc())
+            .limit(1)
+        )
+        latest = status_result.scalar_one_or_none()
+        
+        config = None
+        if monitor.config:
+            try:
+                config = json.loads(monitor.config)
+            except json.JSONDecodeError:
+                pass
+        
+        monitor_data = MonitorWithStatus(
+            id=monitor.id,
+            agent_id=monitor.agent_id,
+            type=monitor.type,
+            name=monitor.name,
+            target=monitor.target,
+            config=config,
+            check_interval=monitor.check_interval,
+            enabled=bool(monitor.enabled),
+            created_at=monitor.created_at,
+            latest_status=LatestStatus(
+                status=latest.status,
+                response_time_ms=latest.response_time_ms,
+                checked_at=latest.checked_at,
+                details=latest.details,
+            ) if latest else None,
+        )
+        response.append(monitor_data)
+    
+    return response
+
+
+@router.post("", response_model=MonitorResponse, status_code=201)
+async def create_monitor(monitor: MonitorCreate, db: AsyncSession = Depends(get_db)):
+    """Create a new monitor."""
+    config_json = None
+    if monitor.config:
+        config_json = json.dumps(monitor.config.model_dump())
+    
+    db_monitor = Monitor(
+        type=monitor.type,
+        name=monitor.name,
+        target=monitor.target,
+        config=config_json,
+        check_interval=monitor.check_interval,
+        enabled=1 if monitor.enabled else 0,
+    )
+    db.add(db_monitor)
+    await db.commit()
+    await db.refresh(db_monitor)
+    
+    return MonitorResponse(
+        id=db_monitor.id,
+        agent_id=db_monitor.agent_id,
+        type=db_monitor.type,
+        name=db_monitor.name,
+        target=db_monitor.target,
+        config=json.loads(db_monitor.config) if db_monitor.config else None,
+        check_interval=db_monitor.check_interval,
+        enabled=bool(db_monitor.enabled),
+        created_at=db_monitor.created_at,
+    )
+
+
+@router.get("/{monitor_id}", response_model=MonitorWithStatus)
+async def get_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
+    """Get a specific monitor by ID."""
+    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    monitor = result.scalar_one_or_none()
+    
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    # Get latest status
+    status_result = await db.execute(
+        select(MonitorStatus)
+        .where(MonitorStatus.monitor_id == monitor.id)
+        .order_by(MonitorStatus.checked_at.desc())
+        .limit(1)
+    )
+    latest = status_result.scalar_one_or_none()
+    
+    config = None
+    if monitor.config:
+        try:
+            config = json.loads(monitor.config)
+        except json.JSONDecodeError:
+            pass
+    
+    return MonitorWithStatus(
+        id=monitor.id,
+        agent_id=monitor.agent_id,
+        type=monitor.type,
+        name=monitor.name,
+        target=monitor.target,
+        config=config,
+        check_interval=monitor.check_interval,
+        enabled=bool(monitor.enabled),
+        created_at=monitor.created_at,
+        latest_status=LatestStatus(
+            status=latest.status,
+            response_time_ms=latest.response_time_ms,
+            checked_at=latest.checked_at,
+            details=latest.details,
+        ) if latest else None,
+    )
+
+
+@router.put("/{monitor_id}", response_model=MonitorResponse)
+async def update_monitor(
+    monitor_id: int,
+    update: MonitorUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a monitor."""
+    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    monitor = result.scalar_one_or_none()
+    
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    # Update fields
+    if update.name is not None:
+        monitor.name = update.name
+    if update.target is not None:
+        monitor.target = update.target
+    if update.config is not None:
+        monitor.config = json.dumps(update.config.model_dump())
+    if update.check_interval is not None:
+        monitor.check_interval = update.check_interval
+    if update.enabled is not None:
+        monitor.enabled = 1 if update.enabled else 0
+    
+    await db.commit()
+    await db.refresh(monitor)
+    
+    return MonitorResponse(
+        id=monitor.id,
+        agent_id=monitor.agent_id,
+        type=monitor.type,
+        name=monitor.name,
+        target=monitor.target,
+        config=json.loads(monitor.config) if monitor.config else None,
+        check_interval=monitor.check_interval,
+        enabled=bool(monitor.enabled),
+        created_at=monitor.created_at,
+    )
+
+
+@router.delete("/{monitor_id}", status_code=204)
+async def delete_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
+    """Delete a monitor."""
+    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    monitor = result.scalar_one_or_none()
+    
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    await db.delete(monitor)
+    await db.commit()
+
+
+@router.post("/{monitor_id}/test", response_model=MonitorTestResponse)
+async def test_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
+    """Test a monitor and return current response (useful for capturing expected hash)."""
+    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    monitor = result.scalar_one_or_none()
+    
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    config = {}
+    if monitor.config:
+        try:
+            config = json.loads(monitor.config)
+        except json.JSONDecodeError:
+            pass
+    
+    check_result = await checker_service.check(monitor.type, monitor.target, config)
+    
+    return MonitorTestResponse(
+        status=check_result.status,
+        response_time_ms=check_result.response_time_ms,
+        details=check_result.details,
+        captured_hash=check_result.body_hash,
+        ssl_expiry_days=check_result.ssl_expiry_days,
+    )
+
+
+@router.get("/{monitor_id}/history", response_model=List[StatusHistoryPoint])
+async def get_monitor_history(
+    monitor_id: int,
+    hours: int = Query(default=72, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get status history for a monitor, grouped into 15-minute intervals."""
+    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    monitor = result.scalar_one_or_none()
+    
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    
+    # Get all status records in the time range
+    status_result = await db.execute(
+        select(MonitorStatus)
+        .where(
+            MonitorStatus.monitor_id == monitor_id,
+            MonitorStatus.checked_at >= cutoff,
+        )
+        .order_by(MonitorStatus.checked_at)
+    )
+    statuses = status_result.scalars().all()
+    
+    # Group into 15-minute intervals
+    interval_minutes = 15
+    history = []
+    
+    if not statuses:
+        return history
+    
+    # Create time buckets
+    current_time = cutoff
+    end_time = datetime.utcnow()
+    
+    while current_time < end_time:
+        bucket_end = current_time + timedelta(minutes=interval_minutes)
+        
+        # Find statuses in this bucket
+        bucket_statuses = [
+            s for s in statuses
+            if current_time <= s.checked_at < bucket_end
+        ]
+        
+        if bucket_statuses:
+            # Calculate uptime percentage
+            up_count = sum(1 for s in bucket_statuses if s.status == "up")
+            uptime = (up_count / len(bucket_statuses)) * 100
+            
+            # Determine overall status for the bucket
+            status_counts = {}
+            for s in bucket_statuses:
+                status_counts[s.status] = status_counts.get(s.status, 0) + 1
+            
+            if status_counts.get("down", 0) > 0:
+                bucket_status = "down"
+            elif status_counts.get("degraded", 0) > 0:
+                bucket_status = "degraded"
+            elif status_counts.get("up", 0) > 0:
+                bucket_status = "up"
+            else:
+                bucket_status = "unknown"
+            
+            # Calculate average response time
+            response_times = [s.response_time_ms for s in bucket_statuses if s.response_time_ms]
+            avg_response = int(sum(response_times) / len(response_times)) if response_times else None
+            
+            history.append(StatusHistoryPoint(
+                timestamp=current_time,
+                status=bucket_status,
+                uptime_percent=round(uptime, 2),
+                response_time_avg_ms=avg_response,
+            ))
+        else:
+            # No data for this bucket
+            history.append(StatusHistoryPoint(
+                timestamp=current_time,
+                status="unknown",
+                uptime_percent=0,
+                response_time_avg_ms=None,
+            ))
+        
+        current_time = bucket_end
+    
+    return history
