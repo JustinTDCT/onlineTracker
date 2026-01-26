@@ -53,8 +53,29 @@ class CheckerService:
         else:
             return CheckResult(status="unknown", details=f"Unknown monitor type: {monitor_type}")
     
+    def _get_latency_status(self, avg_response_time: Optional[int]) -> Tuple[str, Optional[str]]:
+        """Determine status based on latency thresholds.
+        
+        Returns (status, details) tuple.
+        Thresholds: 0-80ms = up, 81-200ms = degraded, 201ms+ = down
+        """
+        if avg_response_time is None:
+            return ("unknown", "No response time data")
+        
+        if avg_response_time <= 80:
+            return ("up", None)
+        elif avg_response_time <= 200:
+            return ("degraded", f"High latency: {avg_response_time}ms")
+        else:
+            return ("down", f"Very high latency: {avg_response_time}ms")
+    
     async def _check_ping(self, target: str, timeout: int) -> CheckResult:
-        """Perform ping check with 20 pings, mark down if >50% fail."""
+        """Perform ping check with 20 pings.
+        
+        Status thresholds:
+        - Success rate: 76-100% = up, 51-75% = degraded, 50% or lower = down
+        - Latency (if success rate is OK): 0-80ms = up, 81-200ms = degraded, 201ms+ = down
+        """
         ping_count = 20
         ping_results: List[PingResultData] = []
         
@@ -103,36 +124,47 @@ class CheckerService:
             
             # Calculate statistics
             successful_pings = [p for p in ping_results if p.success]
-            failed_count = ping_count - len(successful_pings)
+            success_count = len(successful_pings)
+            success_rate = (success_count / ping_count) * 100
             
             # Calculate average response time from successful pings
             avg_response_time = None
             if successful_pings:
                 avg_response_time = int(sum(p.response_time_ms for p in successful_pings) / len(successful_pings))
             
-            # Determine status: down if >50% fail
-            fail_threshold = ping_count / 2  # 10 out of 20
-            if failed_count > fail_threshold:
+            # Determine status based on success rate thresholds
+            # 76-100% = up, 51-75% = degraded, 50% or lower = down
+            if success_rate <= 50:
                 return CheckResult(
                     status="down",
                     response_time_ms=avg_response_time,
-                    details=f"{failed_count}/{ping_count} pings failed",
+                    details=f"{success_count}/{ping_count} pings succeeded ({success_rate:.0f}%)",
                     ping_results=ping_results,
                 )
-            elif failed_count > 0:
-                # Some failures but <=50%, mark as degraded
+            elif success_rate <= 75:
                 return CheckResult(
                     status="degraded",
                     response_time_ms=avg_response_time,
-                    details=f"{failed_count}/{ping_count} pings failed",
+                    details=f"{success_count}/{ping_count} pings succeeded ({success_rate:.0f}%)",
                     ping_results=ping_results,
                 )
             else:
-                return CheckResult(
-                    status="up",
-                    response_time_ms=avg_response_time,
-                    ping_results=ping_results,
-                )
+                # Success rate is good (76-100%), now check latency
+                latency_status, latency_details = self._get_latency_status(avg_response_time)
+                
+                if latency_status == "up":
+                    return CheckResult(
+                        status="up",
+                        response_time_ms=avg_response_time,
+                        ping_results=ping_results,
+                    )
+                else:
+                    return CheckResult(
+                        status=latency_status,
+                        response_time_ms=avg_response_time,
+                        details=latency_details,
+                        ping_results=ping_results,
+                    )
                 
         except asyncio.TimeoutError:
             # All pings timed out
@@ -157,7 +189,15 @@ class CheckerService:
         timeout: int, 
         secure: bool = False
     ) -> CheckResult:
-        """Perform HTTP/HTTPS check."""
+        """Perform HTTP/HTTPS check.
+        
+        Checks in order:
+        1. Expected content (if configured) - down if not found
+        2. Expected status code (if configured) - down if mismatch
+        3. Expected body hash (if configured) - degraded if changed
+        4. HTTP status code - down if not 2xx/3xx
+        5. Latency thresholds: 0-80ms = up, 81-200ms = degraded, 201ms+ = down
+        """
         # Ensure URL has protocol
         if not target.startswith("http"):
             target = f"{'https' if secure else 'http'}://{target}"
@@ -178,16 +218,7 @@ class CheckerService:
             # Calculate body hash
             body_hash = hashlib.md5(response.content).hexdigest()
             
-            # Check expected status
-            if expected_status and response.status_code != expected_status:
-                return CheckResult(
-                    status="down",
-                    response_time_ms=response_time,
-                    details=f"Expected status {expected_status}, got {response.status_code}",
-                    body_hash=body_hash,
-                )
-            
-            # Check expected content in response body
+            # Check expected content in response body FIRST
             if expected_content:
                 response_text = response.text
                 if expected_content not in response_text:
@@ -198,6 +229,15 @@ class CheckerService:
                         body_hash=body_hash,
                     )
             
+            # Check expected status
+            if expected_status and response.status_code != expected_status:
+                return CheckResult(
+                    status="down",
+                    response_time_ms=response_time,
+                    details=f"Expected status {expected_status}, got {response.status_code}",
+                    body_hash=body_hash,
+                )
+            
             # Check expected body hash
             if expected_hash and body_hash != expected_hash:
                 return CheckResult(
@@ -207,8 +247,19 @@ class CheckerService:
                     body_hash=body_hash,
                 )
             
-            # Success criteria: 2xx or 3xx status
-            if 200 <= response.status_code < 400:
+            # Check HTTP status code: must be 2xx or 3xx
+            if not (200 <= response.status_code < 400):
+                return CheckResult(
+                    status="down",
+                    response_time_ms=response_time,
+                    details=f"HTTP {response.status_code}",
+                    body_hash=body_hash,
+                )
+            
+            # All content checks passed, now check latency thresholds
+            latency_status, latency_details = self._get_latency_status(response_time)
+            
+            if latency_status == "up":
                 return CheckResult(
                     status="up",
                     response_time_ms=response_time,
@@ -216,9 +267,9 @@ class CheckerService:
                 )
             else:
                 return CheckResult(
-                    status="down",
+                    status=latency_status,
                     response_time_ms=response_time,
-                    details=f"HTTP {response.status_code}",
+                    details=latency_details,
                     body_hash=body_hash,
                 )
                 
@@ -230,7 +281,13 @@ class CheckerService:
             return CheckResult(status="unknown", details=str(e))
     
     async def _check_ssl(self, target: str, timeout: int) -> CheckResult:
-        """Check SSL certificate expiration."""
+        """Check SSL certificate expiration.
+        
+        Status thresholds:
+        - 31+ days = up
+        - 15-30 days = degraded
+        - 14 days or less = down
+        """
         # Extract hostname and port
         if "://" in target:
             target = target.split("://")[1]
@@ -261,14 +318,20 @@ class CheckerService:
             if expiry_days is None:
                 return CheckResult(status="down", details="Could not get certificate")
             
-            if expiry_days <= 0:
+            if expiry_days <= 14:
+                # 14 days or less = down
+                if expiry_days <= 0:
+                    details = "Certificate expired"
+                else:
+                    details = f"Certificate expires in {expiry_days} days"
                 return CheckResult(
                     status="down",
                     response_time_ms=response_time,
-                    details="Certificate expired",
+                    details=details,
                     ssl_expiry_days=expiry_days,
                 )
-            elif expiry_days <= 7:
+            elif expiry_days <= 30:
+                # 15-30 days = degraded
                 return CheckResult(
                     status="degraded",
                     response_time_ms=response_time,
@@ -276,6 +339,7 @@ class CheckerService:
                     ssl_expiry_days=expiry_days,
                 )
             else:
+                # 31+ days = up
                 return CheckResult(
                     status="up",
                     response_time_ms=response_time,
