@@ -6,6 +6,7 @@ import type {
   Agent,
   Settings,
   StatusOverview,
+  PollPageResult,
 } from '../types';
 
 const API_BASE = '/api';
@@ -66,6 +67,13 @@ export async function deleteMonitor(id: number): Promise<void> {
 export async function testMonitor(id: number): Promise<MonitorTestResult> {
   return fetchJson(`${API_BASE}/monitors/${id}/test`, {
     method: 'POST',
+  });
+}
+
+export async function pollPage(url: string, secure: boolean): Promise<PollPageResult> {
+  return fetchJson(`${API_BASE}/monitors/poll`, {
+    method: 'POST',
+    body: JSON.stringify({ url, secure }),
   });
 }
 

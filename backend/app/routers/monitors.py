@@ -17,8 +17,13 @@ from ..schemas.monitor import (
     MonitorTestResponse,
     StatusHistoryPoint,
     LatestStatus,
+    PollPageRequest,
+    PollPageResponse,
 )
 from ..services.checker import checker_service
+
+import httpx
+from datetime import datetime as dt
 
 router = APIRouter(prefix="/api/monitors", tags=["monitors"])
 
@@ -231,6 +236,43 @@ async def test_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
         captured_hash=check_result.body_hash,
         ssl_expiry_days=check_result.ssl_expiry_days,
     )
+
+
+@router.post("/poll", response_model=PollPageResponse)
+async def poll_page(request: PollPageRequest):
+    """Poll a URL and return the page content for setting up expected content matching."""
+    url = request.url
+    
+    # Ensure URL has protocol
+    if not url.startswith("http"):
+        url = f"{'https' if request.secure else 'http'}://{url}"
+    
+    try:
+        start = dt.now()
+        
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            response = await client.get(url)
+        
+        response_time = int((dt.now() - start).total_seconds() * 1000)
+        
+        # Get content type
+        content_type = response.headers.get("content-type", "")
+        
+        # Return first 10KB of content to avoid huge responses
+        content = response.text[:10240]
+        
+        return PollPageResponse(
+            status_code=response.status_code,
+            content=content,
+            content_type=content_type,
+            response_time_ms=response_time,
+        )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Request timeout")
+    except httpx.ConnectError as e:
+        raise HTTPException(status_code=502, detail=f"Connection error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{monitor_id}/history", response_model=List[StatusHistoryPoint])

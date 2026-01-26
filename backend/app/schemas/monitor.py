@@ -78,3 +78,17 @@ class MonitorTestResponse(BaseModel):
     details: Optional[str] = None
     captured_hash: Optional[str] = None  # For HTTP, the body hash
     ssl_expiry_days: Optional[int] = None  # For SSL checks
+
+
+class PollPageRequest(BaseModel):
+    """Request to poll a page for content."""
+    url: str
+    secure: bool = False  # True for HTTPS
+
+
+class PollPageResponse(BaseModel):
+    """Response from polling a page."""
+    status_code: int
+    content: str  # First portion of the page content
+    content_type: Optional[str] = None
+    response_time_ms: int

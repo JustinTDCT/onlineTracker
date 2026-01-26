@@ -52,6 +52,13 @@ export interface MonitorTestResult {
   ssl_expiry_days?: number;
 }
 
+export interface PollPageResult {
+  status_code: number;
+  content: string;
+  content_type?: string;
+  response_time_ms: number;
+}
+
 // Agent types
 export interface Agent {
   id: string;
