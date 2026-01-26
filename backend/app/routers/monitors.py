@@ -241,6 +241,8 @@ async def test_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/poll", response_model=PollPageResponse)
 async def poll_page(request: PollPageRequest):
     """Poll a URL and return the page content for setting up expected content matching."""
+    import re
+    
     url = request.url
     
     # Ensure URL has protocol
@@ -250,7 +252,8 @@ async def poll_page(request: PollPageRequest):
     try:
         start = dt.now()
         
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        # Disable SSL verification to handle self-signed certs
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True, verify=False) as client:
             response = await client.get(url)
         
         response_time = int((dt.now() - start).total_seconds() * 1000)
@@ -258,14 +261,30 @@ async def poll_page(request: PollPageRequest):
         # Get content type
         content_type = response.headers.get("content-type", "")
         
+        # Try to extract page title for suggested match text
+        text = response.text
+        suggested_content = ""
+        
+        # Try to find <title> tag
+        title_match = re.search(r'<title[^>]*>([^<]+)</title>', text, re.IGNORECASE)
+        if title_match:
+            suggested_content = title_match.group(1).strip()
+        
+        # If no title, try first <h1>
+        if not suggested_content:
+            h1_match = re.search(r'<h1[^>]*>([^<]+)</h1>', text, re.IGNORECASE)
+            if h1_match:
+                suggested_content = h1_match.group(1).strip()
+        
         # Return first 10KB of content to avoid huge responses
-        content = response.text[:10240]
+        content = text[:10240]
         
         return PollPageResponse(
             status_code=response.status_code,
             content=content,
             content_type=content_type,
             response_time_ms=response_time,
+            suggested_content=suggested_content if suggested_content else None,
         )
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Request timeout")

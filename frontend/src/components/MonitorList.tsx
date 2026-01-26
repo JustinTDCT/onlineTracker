@@ -17,7 +17,7 @@ import {
   testMonitor,
   pollPage,
 } from '../api/client';
-import type { Monitor, MonitorCreate, MonitorTestResult, PollPageResult } from '../types';
+import type { Monitor, MonitorCreate, MonitorTestResult } from '../types';
 
 export default function MonitorList() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
@@ -281,28 +281,29 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
   );
   const [saving, setSaving] = useState(false);
   const [polling, setPolling] = useState(false);
-  const [pollResult, setPollResult] = useState<PollPageResult | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [pollSuccess, setPollSuccess] = useState<string | null>(null);
 
   async function handlePollPage() {
     if (!target) return;
     setPolling(true);
     setPollError(null);
-    setPollResult(null);
+    setPollSuccess(null);
     
     try {
       const result = await pollPage(target, type === 'https');
-      setPollResult(result);
+      
+      if (result.suggested_content) {
+        setExpectedContent(result.suggested_content);
+        setPollSuccess(`Found: "${result.suggested_content}"`);
+      } else {
+        setPollError('Could not extract page title or heading. Enter text manually.');
+      }
     } catch (err) {
       setPollError(err instanceof Error ? err.message : 'Poll failed');
     } finally {
       setPolling(false);
     }
-  }
-
-  function handleSelectContent(text: string) {
-    setExpectedContent(text);
-    setPollResult(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -448,6 +449,9 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
                 {pollError && (
                   <p className="text-xs text-red-500 mt-1">{pollError}</p>
                 )}
+                {pollSuccess && (
+                  <p className="text-xs text-green-500 mt-1">{pollSuccess}</p>
+                )}
               </div>
             </>
           )}
@@ -483,56 +487,6 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
           </div>
         </form>
       </div>
-
-      {/* Poll Result Modal */}
-      {pollResult && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Page Content</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Status: {pollResult.status_code} | Response: {pollResult.response_time_ms}ms
-                </p>
-              </div>
-              <button onClick={() => setPollResult(null)}>
-                <X className="h-5 w-5 text-gray-400" />
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              Select text below and click "Use Selected" to set as expected content:
-            </p>
-            <textarea
-              readOnly
-              value={pollResult.content}
-              className="flex-1 w-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg px-3 py-2 font-mono text-xs resize-none min-h-[300px]"
-            />
-            <div className="flex gap-3 mt-4">
-              <button
-                type="button"
-                onClick={() => setPollResult(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const selection = window.getSelection()?.toString();
-                  if (selection) {
-                    handleSelectContent(selection);
-                  } else {
-                    alert('Please select some text from the page content first');
-                  }
-                }}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-              >
-                Use Selected
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

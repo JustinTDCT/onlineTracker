@@ -92,3 +92,4 @@ class PollPageResponse(BaseModel):
     content: str  # First portion of the page content
     content_type: Optional[str] = None
     response_time_ms: int
+    suggested_content: Optional[str] = None  # Auto-extracted title or heading

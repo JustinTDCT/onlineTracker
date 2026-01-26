@@ -57,6 +57,7 @@ export interface PollPageResult {
   content: string;
   content_type?: string;
   response_time_ms: number;
+  suggested_content?: string;
 }
 
 // Agent types
