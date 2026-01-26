@@ -1,6 +1,10 @@
 # OnlineTracker Docker Compose
 # Server and agent deployment
 #
+# The server runs TWO ports:
+#   - WEB_PORT (8000): Web UI + full admin API - keep internal/protected
+#   - COMS_PORT (19443): Agent API only - safe to expose for remote agents
+#
 # Host ports are configurable via environment variables:
 #   HOST_WEB_PORT - Web UI port (default: 8000)
 #   HOST_COMS_PORT - Agent communication port (default: 19443)
@@ -18,15 +22,15 @@ services:
       - WEB_PORT=8000
       - COMS_PORT=19443
     ports:
-      - "${HOST_WEB_PORT:-8000}:8000"      # Web UI
-      - "${HOST_COMS_PORT:-19443}:19443"   # Agent communication
+      - "${HOST_WEB_PORT:-8000}:8000"      # Web UI + Admin API (keep internal)
+      - "${HOST_COMS_PORT:-19443}:19443"   # Agent API only (safe to expose)
     volumes:
       - onlinetracker-data:/data
     restart: unless-stopped
 
   # Test agent instance
   # To use: set shared secret and allowed UUIDs in Settings first
-  # COMS_PORT should match the server's web/API port (default 8000)
+  # COMS_PORT should match the server's agent API port (default 19443)
   onlinetracker-agent:
     build: .
     container_name: onlinetracker-agent
@@ -34,7 +38,7 @@ services:
       - MODE=agent
       - AGENT_NAME=TAB2
       - SERVER_HOST=onlinetracker-server
-      - COMS_PORT=8000
+      - COMS_PORT=19443
       - SHARED_SECRET=test-secret-change-me
     volumes:
       - onlinetracker-agent-data:/data

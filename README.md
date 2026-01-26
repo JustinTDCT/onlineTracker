@@ -62,11 +62,22 @@ docker run -d \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MODE` | `server` | Run mode: `server` or `agent` |
-| `WEB_PORT` | `8000` | Web UI port (server mode) |
-| `COMS_PORT` | `19443` | Agent communication port |
+| `WEB_PORT` | `8000` | Web UI + Admin API port (server mode) |
+| `COMS_PORT` | `19443` | Agent-only API port (server mode) / Server port to connect to (agent mode) |
 | `DATA_PATH` | `/data` | SQLite database location |
 | `SERVER_HOST` | - | Agent mode: server hostname |
 | `SHARED_SECRET` | - | Agent mode: authentication secret |
+
+## Port Architecture
+
+The server runs **two separate services**:
+
+| Port | Service | Endpoints | Security |
+|------|---------|-----------|----------|
+| 8000 (WEB_PORT) | Web UI + Admin API | Full UI, all `/api/*` endpoints | Keep internal/protected |
+| 19443 (COMS_PORT) | Agent API only | `/api/agents/register`, `/api/agents/report`, `/api/agents/{id}/monitors` | Safe to expose publicly |
+
+This allows you to expose only the agent port (19443) to the internet for remote agents, while keeping the admin UI on an internal network.
 
 ## Server Mode
 
