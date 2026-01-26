@@ -303,7 +303,7 @@ async def poll_page(request: PollPageRequest):
 @router.get("/{monitor_id}/history", response_model=List[StatusHistoryPoint])
 async def get_monitor_history(
     monitor_id: int,
-    hours: int = Query(default=72, ge=1, le=168),
+    hours: int = Query(default=72, ge=1, le=8760),  # Max 1 year
     db: AsyncSession = Depends(get_db),
 ):
     """Get status history for a monitor, grouped into 15-minute intervals."""

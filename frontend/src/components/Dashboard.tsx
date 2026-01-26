@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertCircle, CheckCircle, Clock, HelpCircle, TrendingUp } from 'lucide-react';
+import { Activity, AlertCircle, Calendar, CheckCircle, Clock, HelpCircle, TrendingUp } from 'lucide-react';
 import { getMonitors, getMonitorHistory } from '../api/client';
 import type { Monitor, StatusHistoryPoint } from '../types';
 import MiniStatusGraph from './MiniStatusGraph';
@@ -9,26 +9,42 @@ interface MonitorWithHistory extends Monitor {
   history: StatusHistoryPoint[];
 }
 
+type TimeRange = {
+  label: string;
+  hours: number;
+  uptimeLabel: string;
+};
+
+const TIME_RANGES: TimeRange[] = [
+  { label: 'Last 24 Hours', hours: 24, uptimeLabel: '24h Uptime' },
+  { label: 'Last Week', hours: 168, uptimeLabel: '7d Uptime' },
+  { label: 'Last Month', hours: 720, uptimeLabel: '30d Uptime' },
+  { label: 'Last 3 Months', hours: 2160, uptimeLabel: '90d Uptime' },
+  { label: 'Last Year', hours: 8760, uptimeLabel: '1y Uptime' },
+];
+
 export default function Dashboard() {
   const [monitors, setMonitors] = useState<MonitorWithHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRange, setSelectedRange] = useState<TimeRange>(TIME_RANGES[0]);
 
   useEffect(() => {
     loadMonitors();
     const interval = setInterval(loadMonitors, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedRange]);
 
   async function loadMonitors() {
     try {
+      setLoading(true);
       const monitorList = await getMonitors();
       
       // Load history for each monitor
       const monitorsWithHistory = await Promise.all(
         monitorList.map(async (monitor) => {
           try {
-            const history = await getMonitorHistory(monitor.id, 72);
+            const history = await getMonitorHistory(monitor.id, selectedRange.hours);
             return { ...monitor, history };
           } catch {
             return { ...monitor, history: [] };
@@ -138,7 +154,7 @@ export default function Dashboard() {
               <TrendingUp className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">24h Uptime</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{selectedRange.uptimeLabel}</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{overallUptime.toFixed(1)}%</p>
             </div>
           </div>
@@ -161,12 +177,31 @@ export default function Dashboard() {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">All Monitors</h2>
-          <Link
-            to="/monitors"
-            className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
-          >
-            Manage →
-          </Link>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-400" />
+              <select
+                value={selectedRange.hours}
+                onChange={(e) => {
+                  const range = TIME_RANGES.find(r => r.hours === Number(e.target.value));
+                  if (range) setSelectedRange(range);
+                }}
+                className="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-indigo-500"
+              >
+                {TIME_RANGES.map((range) => (
+                  <option key={range.hours} value={range.hours}>
+                    {range.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Link
+              to="/monitors"
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
+            >
+              Manage →
+            </Link>
+          </div>
         </div>
         
         {monitors.length === 0 ? (
