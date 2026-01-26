@@ -91,10 +91,13 @@ class AgentClientService:
             logger.error("SERVER_HOST and SHARED_SECRET must be configured for agent mode")
             return False
         
+        url = f"{self.server_url}/api/agents/register"
+        logger.info(f"Attempting to register at: {url}")
+        
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=30, verify=False) as client:
                 response = await client.post(
-                    f"{self.server_url}/api/agents/register",
+                    url,
                     json={
                         "uuid": self.agent_uuid,
                         "secret_hash": self.secret_hash,
@@ -114,9 +117,15 @@ class AgentClientService:
                 else:
                     logger.error(f"Registration failed: {response.status_code} - {response.text}")
                     return False
-                    
+        
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error to {url}: {e}")
+            return False
+        except httpx.TimeoutException as e:
+            logger.error(f"Timeout connecting to {url}: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to register with server: {e}")
+            logger.error(f"Failed to register with server at {url}: {type(e).__name__}: {e}")
             return False
     
     async def report_results(self, results: list) -> bool:
