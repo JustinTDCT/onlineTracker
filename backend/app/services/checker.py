@@ -61,16 +61,16 @@ class CheckerService:
         try:
             # Use system ping command with 20 pings
             # -c 20: send 20 pings
-            # -i 0.2: 200ms interval between pings
+            # -i 1: 1 second interval (avoid rate-limiting on iDRACs, switches, etc.)
             # -W: timeout per ping
             proc = await asyncio.create_subprocess_exec(
-                "ping", "-c", str(ping_count), "-i", "0.2", "-W", str(timeout), target,
+                "ping", "-c", str(ping_count), "-i", "1", "-W", str(timeout), target,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             
-            # Wait for all pings to complete (20 pings * 0.2s interval + timeout buffer)
-            total_timeout = (ping_count * 0.2) + timeout + 5
+            # Wait for all pings to complete (20 pings * 1s interval + timeout buffer)
+            total_timeout = ping_count + timeout + 5
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=total_timeout)
             
             output = stdout.decode()
