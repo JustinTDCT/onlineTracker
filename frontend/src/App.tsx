@@ -23,7 +23,7 @@ function App() {
   }, [darkMode]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -100,7 +100,7 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/monitors" element={<MonitorList />} />
@@ -108,6 +108,12 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
+
+      {/* Footer */}
+      <footer className="site-footer">
+        <p>©opyright 2026 Justin Dube. All Rights Reserved.</p>
+        <p>Designed by 21 Mexican Jumping Llamas</p>
+      </footer>
     </div>
   );
 }
