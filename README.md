@@ -1,5 +1,7 @@
 # OnlineTracker
 
+**Version 1.1.0**
+
 A Docker-based service monitoring system with support for distributed agents.
 
 ## Features

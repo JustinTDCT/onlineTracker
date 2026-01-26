@@ -7,6 +7,8 @@ import MonitorDetail from './components/MonitorDetail';
 import AgentList from './components/AgentList';
 import SettingsPage from './components/SettingsPage';
 
+export const APP_VERSION = '1.1.0';
+
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -31,7 +33,10 @@ function App() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
               <Activity className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
-              <span className="text-xl font-bold text-gray-900 dark:text-white">OnlineTracker</span>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-gray-900 dark:text-white leading-tight">OnlineTracker</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">v{APP_VERSION}</span>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <nav className="flex gap-1">
