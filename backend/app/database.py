@@ -39,6 +39,23 @@ async def init_db():
     
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Run migrations for existing databases
+        await _run_migrations(conn)
+
+
+async def _run_migrations(conn):
+    """Run database migrations for schema updates."""
+    from sqlalchemy import text
+    
+    # Migration: Add ssl_expiry_days column to monitor_status if missing
+    try:
+        await conn.execute(text(
+            "ALTER TABLE monitor_status ADD COLUMN ssl_expiry_days INTEGER"
+        ))
+    except Exception:
+        # Column already exists
+        pass
 
 
 async def close_db():
