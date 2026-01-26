@@ -1,16 +1,38 @@
 """Database setup and session management."""
 import os
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 
 from .config import settings, get_database_url
 
-# Create async engine
+# Create async engine with connection pool settings for SQLite
 engine = create_async_engine(
     get_database_url(),
     echo=False,
     future=True,
+    # Pool settings for better concurrency
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+    # SQLite-specific: use NullPool would be an option but we'll use connection events instead
+    connect_args={"timeout": 30},  # Wait up to 30 seconds for locks
 )
+
+
+# Enable WAL mode and busy timeout on each connection
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    """Configure SQLite for better concurrent access."""
+    cursor = dbapi_connection.cursor()
+    # WAL mode allows concurrent reads during writes
+    cursor.execute("PRAGMA journal_mode=WAL")
+    # Wait up to 30 seconds for locks before failing
+    cursor.execute("PRAGMA busy_timeout=30000")
+    # Synchronous mode - NORMAL is a good balance of safety and speed
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
+
 
 # Session factory
 async_session = async_sessionmaker(
