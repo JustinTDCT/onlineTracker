@@ -29,7 +29,7 @@ export default function AgentList() {
       ? prompt('Enter a friendly name for this agent:', agent.name || agent.id.slice(0, 8))
       : undefined;
 
-    if (approved && name === null) return; // User cancelled
+    if (approved && name === null) return;
 
     try {
       await approveAgent(agent.id, approved, name || undefined);
@@ -56,21 +56,21 @@ export default function AgentList() {
     switch (status) {
       case 'approved':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
             <CheckCircle className="h-3 w-3" />
             Approved
           </span>
         );
       case 'rejected':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
             <XCircle className="h-3 w-3" />
             Rejected
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
+          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full">
             <Clock className="h-3 w-3" />
             Pending
           </span>
@@ -94,14 +94,14 @@ export default function AgentList() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Agents</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
           Manage remote monitoring agents that report back to this server.
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-center justify-between">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400 flex items-center justify-between">
           {error}
           <button onClick={() => setError(null)}>
             <X className="h-4 w-4" />
@@ -109,42 +109,42 @@ export default function AgentList() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name / ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monitors</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Seen</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name / ID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Monitors</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Last Seen</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Registered</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {agents.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                   No agents registered yet. Deploy an agent in agent mode to see it here.
                 </td>
               </tr>
             ) : (
               agents.map((agent) => (
-                <tr key={agent.id} className="hover:bg-gray-50">
+                <tr key={agent.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {statusBadge(agent.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{agent.name || 'Unnamed'}</div>
-                    <div className="text-xs text-gray-500 font-mono">{agent.id.slice(0, 8)}...</div>
+                    <div className="font-medium text-gray-900 dark:text-white">{agent.name || 'Unnamed'}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{agent.id.slice(0, 8)}...</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {agent.monitor_count}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {formatDate(agent.last_seen)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {formatDate(agent.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -153,14 +153,14 @@ export default function AgentList() {
                         <>
                           <button
                             onClick={() => handleApprove(agent, true)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
                             title="Approve"
                           >
                             <Check className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleApprove(agent, false)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                             title="Reject"
                           >
                             <X className="h-4 w-4" />
@@ -169,7 +169,7 @@ export default function AgentList() {
                       )}
                       <button
                         onClick={() => handleDelete(agent)}
-                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -184,12 +184,12 @@ export default function AgentList() {
       </div>
 
       {/* Instructions */}
-      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-        <h3 className="font-medium text-indigo-900 mb-2">Deploying an Agent</h3>
-        <p className="text-sm text-indigo-800 mb-3">
+      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
+        <h3 className="font-medium text-indigo-900 dark:text-indigo-300 mb-2">Deploying an Agent</h3>
+        <p className="text-sm text-indigo-800 dark:text-indigo-400 mb-3">
           Run the OnlineTracker image in agent mode on a remote server:
         </p>
-        <pre className="bg-white border border-indigo-200 rounded-lg p-3 text-sm overflow-x-auto">
+        <pre className="bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700 rounded-lg p-3 text-sm overflow-x-auto text-gray-800 dark:text-gray-200">
 {`docker run -d \\
   -e MODE=agent \\
   -e SERVER_HOST=your-server-hostname \\

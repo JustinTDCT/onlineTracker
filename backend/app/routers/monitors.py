@@ -52,6 +52,7 @@ async def list_monitors(db: AsyncSession = Depends(get_db)):
             agent_id=monitor.agent_id,
             type=monitor.type,
             name=monitor.name,
+            description=monitor.description,
             target=monitor.target,
             config=config,
             check_interval=monitor.check_interval,
@@ -79,6 +80,7 @@ async def create_monitor(monitor: MonitorCreate, db: AsyncSession = Depends(get_
     db_monitor = Monitor(
         type=monitor.type,
         name=monitor.name,
+        description=monitor.description,
         target=monitor.target,
         config=config_json,
         check_interval=monitor.check_interval,
@@ -93,6 +95,7 @@ async def create_monitor(monitor: MonitorCreate, db: AsyncSession = Depends(get_
         agent_id=db_monitor.agent_id,
         type=db_monitor.type,
         name=db_monitor.name,
+        description=db_monitor.description,
         target=db_monitor.target,
         config=json.loads(db_monitor.config) if db_monitor.config else None,
         check_interval=db_monitor.check_interval,
@@ -131,6 +134,7 @@ async def get_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
         agent_id=monitor.agent_id,
         type=monitor.type,
         name=monitor.name,
+        description=monitor.description,
         target=monitor.target,
         config=config,
         check_interval=monitor.check_interval,
@@ -161,6 +165,8 @@ async def update_monitor(
     # Update fields
     if update.name is not None:
         monitor.name = update.name
+    if update.description is not None:
+        monitor.description = update.description
     if update.target is not None:
         monitor.target = update.target
     if update.config is not None:
@@ -178,6 +184,7 @@ async def update_monitor(
         agent_id=monitor.agent_id,
         type=monitor.type,
         name=monitor.name,
+        description=monitor.description,
         target=monitor.target,
         config=json.loads(monitor.config) if monitor.config else None,
         check_interval=monitor.check_interval,

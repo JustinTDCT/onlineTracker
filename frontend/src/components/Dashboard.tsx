@@ -30,7 +30,6 @@ export default function Dashboard() {
       setOverview(data);
       setError(null);
       
-      // Select first monitor if none selected
       if (!selectedMonitorId && data.monitors.length > 0) {
         setSelectedMonitorId(data.monitors[0].id);
       }
@@ -60,7 +59,7 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400">
         {error}
       </div>
     );
@@ -70,27 +69,19 @@ export default function Dashboard() {
 
   const statusColor = (status: string) => {
     switch (status) {
-      case 'up':
-        return 'text-green-500';
-      case 'down':
-        return 'text-red-500';
-      case 'degraded':
-        return 'text-yellow-500';
-      default:
-        return 'text-gray-400';
+      case 'up': return 'text-green-500';
+      case 'down': return 'text-red-500';
+      case 'degraded': return 'text-yellow-500';
+      default: return 'text-gray-400';
     }
   };
 
   const statusBgColor = (status: string) => {
     switch (status) {
-      case 'up':
-        return 'bg-green-100';
-      case 'down':
-        return 'bg-red-100';
-      case 'degraded':
-        return 'bg-yellow-100';
-      default:
-        return 'bg-gray-100';
+      case 'up': return 'bg-green-100 dark:bg-green-900/30';
+      case 'down': return 'bg-red-100 dark:bg-red-900/30';
+      case 'degraded': return 'bg-yellow-100 dark:bg-yellow-900/30';
+      default: return 'bg-gray-100 dark:bg-gray-800';
     }
   };
 
@@ -98,50 +89,50 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Up</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.monitors_up}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Up</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{overview.monitors_up}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <AlertCircle className="h-6 w-6 text-red-600" />
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Down</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.monitors_down}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Down</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{overview.monitors_down}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-indigo-600" />
+            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+              <TrendingUp className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">24h Uptime</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.overall_uptime_24h}%</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">24h Uptime</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{overview.overall_uptime_24h}%</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <Activity className="h-6 w-6 text-gray-600" />
+            <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              <Activity className="h-6 w-6 text-gray-600 dark:text-gray-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Total Monitors</p>
-              <p className="text-2xl font-bold text-gray-900">{overview.total_monitors}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Total Monitors</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{overview.total_monitors}</p>
             </div>
           </div>
         </div>
@@ -149,13 +140,13 @@ export default function Dashboard() {
 
       {/* Status graph */}
       {selectedMonitorId && history.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">72-Hour Status</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">72-Hour Status</h2>
             <select
               value={selectedMonitorId}
               onChange={(e) => setSelectedMonitorId(Number(e.target.value))}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm"
             >
               {overview.monitors.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -169,21 +160,21 @@ export default function Dashboard() {
       )}
 
       {/* Monitor list */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">All Monitors</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">All Monitors</h2>
           <Link
             to="/monitors"
-            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
           >
             View all →
           </Link>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-100 dark:divide-gray-700">
           {overview.monitors.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-500">
+            <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
               No monitors configured.{' '}
-              <Link to="/monitors" className="text-indigo-600 hover:underline">
+              <Link to="/monitors" className="text-indigo-600 dark:text-indigo-400 hover:underline">
                 Add one
               </Link>
             </div>
@@ -191,7 +182,7 @@ export default function Dashboard() {
             overview.monitors.map((monitor) => (
               <div
                 key={monitor.id}
-                className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 cursor-pointer"
+                className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
                 onClick={() => setSelectedMonitorId(monitor.id)}
               >
                 <div className="flex items-center gap-3">
@@ -202,15 +193,15 @@ export default function Dashboard() {
                     {monitor.status === 'unknown' && <HelpCircle className={`h-5 w-5 ${statusColor(monitor.status)}`} />}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{monitor.name}</p>
-                    <p className="text-sm text-gray-500">{monitor.type.toUpperCase()}</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{monitor.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{monitor.type.toUpperCase()}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className={`font-medium ${statusColor(monitor.status)}`}>
                     {monitor.status.charAt(0).toUpperCase() + monitor.status.slice(1)}
                   </p>
-                  <p className="text-sm text-gray-500">{monitor.uptime_24h}% uptime</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{monitor.uptime_24h}% uptime</p>
                 </div>
               </div>
             ))
@@ -220,9 +211,9 @@ export default function Dashboard() {
 
       {/* Pending agents alert */}
       {overview.agents_pending > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 text-yellow-600" />
-          <span className="text-yellow-800">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+          <span className="text-yellow-800 dark:text-yellow-300">
             {overview.agents_pending} agent{overview.agents_pending > 1 ? 's' : ''} pending approval.{' '}
             <Link to="/agents" className="font-medium underline">
               Review

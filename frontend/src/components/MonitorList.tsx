@@ -64,14 +64,10 @@ export default function MonitorList() {
 
   const statusIcon = (status?: string) => {
     switch (status) {
-      case 'up':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case 'down':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
-      case 'degraded':
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />;
-      default:
-        return <HelpCircle className="h-5 w-5 text-gray-400" />;
+      case 'up': return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'down': return <AlertCircle className="h-5 w-5 text-red-500" />;
+      case 'degraded': return <AlertCircle className="h-5 w-5 text-yellow-500" />;
+      default: return <HelpCircle className="h-5 w-5 text-gray-400" />;
     }
   };
 
@@ -86,7 +82,7 @@ export default function MonitorList() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Monitors</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Monitors</h1>
         <button
           onClick={() => {
             setEditingMonitor(null);
@@ -100,7 +96,7 @@ export default function MonitorList() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-center justify-between">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400 flex items-center justify-between">
           {error}
           <button onClick={() => setError(null)}>
             <X className="h-4 w-4" />
@@ -133,50 +129,53 @@ export default function MonitorList() {
       )}
 
       {/* Monitor table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Interval</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Response</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Target</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Interval</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Response</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {monitors.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                   No monitors configured. Click "Add Monitor" to create one.
                 </td>
               </tr>
             ) : (
               monitors.map((monitor) => (
-                <tr key={monitor.id} className="hover:bg-gray-50">
+                <tr key={monitor.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {statusIcon(monitor.latest_status?.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{monitor.name}</div>
+                    <div className="font-medium text-gray-900 dark:text-white">{monitor.name}</div>
+                    {monitor.description && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{monitor.description}</div>
+                    )}
                     {!monitor.enabled && (
-                      <span className="text-xs text-gray-500">Disabled</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Disabled</span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded">
+                    <span className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
                       {monitor.type.toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
                     {monitor.target}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {monitor.check_interval}s
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                     {monitor.latest_status?.response_time_ms
                       ? `${monitor.latest_status.response_time_ms}ms`
                       : '-'}
@@ -185,7 +184,7 @@ export default function MonitorList() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleTest(monitor)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                         title="Test"
                       >
                         <Play className="h-4 w-4" />
@@ -195,14 +194,14 @@ export default function MonitorList() {
                           setEditingMonitor(monitor);
                           setShowForm(true);
                         }}
-                        className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                         title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(monitor)}
-                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -219,9 +218,9 @@ export default function MonitorList() {
       {/* Test result modal */}
       {testResult && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Test Result</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Test Result</h3>
               <button onClick={() => setTestResult(null)}>
                 <X className="h-5 w-5 text-gray-400" />
               </button>
@@ -229,23 +228,23 @@ export default function MonitorList() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 {statusIcon(testResult.result.status)}
-                <span className="font-medium capitalize">{testResult.result.status}</span>
+                <span className="font-medium capitalize text-gray-900 dark:text-white">{testResult.result.status}</span>
               </div>
               {testResult.result.response_time_ms && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Response time: {testResult.result.response_time_ms}ms
                 </p>
               )}
               {testResult.result.details && (
-                <p className="text-sm text-gray-600">Details: {testResult.result.details}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Details: {testResult.result.details}</p>
               )}
               {testResult.result.captured_hash && (
-                <p className="text-sm text-gray-600 font-mono text-xs">
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-mono text-xs">
                   Body hash: {testResult.result.captured_hash}
                 </p>
               )}
               {testResult.result.ssl_expiry_days !== undefined && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   SSL expires in: {testResult.result.ssl_expiry_days} days
                 </p>
               )}
@@ -266,9 +265,10 @@ interface FormProps {
 
 function MonitorForm({ monitor, onClose, onSave }: FormProps) {
   const [type, setType] = useState<'ping' | 'http' | 'https' | 'ssl'>(
-    monitor?.type || 'http'
+    monitor?.type || 'ping'
   );
   const [name, setName] = useState(monitor?.name || '');
+  const [description, setDescription] = useState(monitor?.description || '');
   const [target, setTarget] = useState(monitor?.target || '');
   const [interval, setInterval] = useState(monitor?.check_interval || 60);
   const [enabled, setEnabled] = useState(monitor?.enabled ?? true);
@@ -289,6 +289,7 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
     await onSave({
       type,
       name,
+      description: description || undefined,
       target,
       check_interval: interval,
       enabled,
@@ -300,9 +301,9 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full mx-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-lg w-full mx-4">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {monitor ? 'Edit Monitor' : 'Add Monitor'}
           </h3>
           <button onClick={onClose}>
@@ -312,11 +313,11 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as typeof type)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
               disabled={!!monitor}
             >
               <option value="ping">Ping</option>
@@ -327,38 +328,49 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              placeholder="My Website"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+              placeholder="My Server"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Target</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+              placeholder="Production Hyper-V host in rack 2"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target</label>
             <input
               type="text"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              placeholder={type === 'ping' ? 'example.com' : 'https://example.com'}
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+              placeholder={type === 'ping' ? '192.168.1.100' : 'https://example.com'}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Check Interval (seconds)
             </label>
             <input
               type="number"
               value={interval}
               onChange={(e) => setInterval(parseInt(e.target.value, 10))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
               min={10}
               max={3600}
             />
@@ -366,14 +378,14 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
 
           {(type === 'http' || type === 'https') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Expected Status Code (optional)
               </label>
               <input
                 type="number"
                 value={expectedStatus}
                 onChange={(e) => setExpectedStatus(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
                 placeholder="200"
               />
             </div>
@@ -385,9 +397,9 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
               id="enabled"
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
-              className="rounded border-gray-300"
+              className="rounded border-gray-300 dark:border-gray-600"
             />
-            <label htmlFor="enabled" className="text-sm text-gray-700">
+            <label htmlFor="enabled" className="text-sm text-gray-700 dark:text-gray-300">
               Enabled
             </label>
           </div>
@@ -396,7 +408,7 @@ function MonitorForm({ monitor, onClose, onSave }: FormProps) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               Cancel
             </button>

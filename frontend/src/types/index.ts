@@ -17,6 +17,7 @@ export interface Monitor {
   agent_id?: string;
   type: 'ping' | 'http' | 'https' | 'ssl';
   name: string;
+  description?: string;
   target: string;
   config?: MonitorConfig;
   check_interval: number;
@@ -28,6 +29,7 @@ export interface Monitor {
 export interface MonitorCreate {
   type: 'ping' | 'http' | 'https' | 'ssl';
   name: string;
+  description?: string;
   target: string;
   config?: MonitorConfig;
   check_interval?: number;

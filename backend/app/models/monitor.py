@@ -15,6 +15,7 @@ class Monitor(Base):
     agent_id = Column(String, ForeignKey("agents.id"), nullable=True)  # NULL = server-side
     type = Column(String, nullable=False)  # ping, http, https, ssl
     name = Column(String, nullable=False)
+    description = Column(String, nullable=True)  # Optional descriptive text
     target = Column(String, nullable=False)  # IP/hostname/URL
     config = Column(String, nullable=True)  # JSON: expected_status, expected_body_hash, etc.
     check_interval = Column(Integer, default=60)  # seconds

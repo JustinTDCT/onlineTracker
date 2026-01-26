@@ -6,7 +6,7 @@ interface Props {
 
 export default function StatusGraph({ history }: Props) {
   const getColor = (status: string, uptime: number) => {
-    if (status === 'unknown' || uptime === 0) return 'bg-gray-200';
+    if (status === 'unknown' || uptime === 0) return 'bg-gray-300 dark:bg-gray-600';
     if (status === 'down' || uptime < 50) return 'bg-red-500';
     if (status === 'degraded' || uptime < 90) return 'bg-yellow-500';
     return 'bg-green-500';
@@ -22,8 +22,7 @@ export default function StatusGraph({ history }: Props) {
     });
   };
 
-  // Group history into chunks for display
-  const displayPoints = history.slice(-96); // Last 24 hours at 15-min intervals
+  const displayPoints = history.slice(-96);
 
   return (
     <div className="space-y-2">
@@ -37,7 +36,7 @@ export default function StatusGraph({ history }: Props) {
           >
             {/* Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-              <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+              <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                 <p className="font-medium">{formatTime(point.timestamp)}</p>
                 <p className="text-gray-300">
                   {point.status.charAt(0).toUpperCase() + point.status.slice(1)} - {point.uptime_percent}%
@@ -52,7 +51,7 @@ export default function StatusGraph({ history }: Props) {
       </div>
 
       {/* Time labels */}
-      <div className="flex justify-between text-xs text-gray-500">
+      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>72 hours ago</span>
         <span>48 hours ago</span>
         <span>24 hours ago</span>
@@ -60,7 +59,7 @@ export default function StatusGraph({ history }: Props) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-gray-600 pt-2">
+      <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400 pt-2">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-green-500"></div>
           <span>Up</span>
@@ -74,7 +73,7 @@ export default function StatusGraph({ history }: Props) {
           <span>Down</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-gray-200"></div>
+          <div className="w-3 h-3 rounded bg-gray-300 dark:bg-gray-600"></div>
           <span>No data</span>
         </div>
       </div>

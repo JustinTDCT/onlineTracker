@@ -15,6 +15,7 @@ class MonitorCreate(BaseModel):
     """Schema for creating a new monitor."""
     type: str = Field(..., pattern="^(ping|http|https|ssl)$")
     name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
     target: str = Field(..., min_length=1)
     config: Optional[MonitorConfig] = None
     check_interval: int = Field(default=60, ge=10, le=3600)
@@ -24,6 +25,7 @@ class MonitorCreate(BaseModel):
 class MonitorUpdate(BaseModel):
     """Schema for updating a monitor."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
     target: Optional[str] = Field(None, min_length=1)
     config: Optional[MonitorConfig] = None
     check_interval: Optional[int] = Field(None, ge=10, le=3600)
@@ -36,6 +38,7 @@ class MonitorResponse(BaseModel):
     agent_id: Optional[str] = None
     type: str
     name: str
+    description: Optional[str] = None
     target: str
     config: Optional[dict] = None
     check_interval: int
