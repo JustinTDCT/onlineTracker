@@ -19,5 +19,6 @@ class MonitorStatus(Base):
     details = Column(String, nullable=True)  # Error message or extra info
     ssl_expiry_days = Column(Integer, nullable=True)  # Days until SSL cert expires
     
-    # Relationship
+    # Relationships
     monitor = relationship("Monitor", back_populates="statuses")
+    ping_results = relationship("PingResult", back_populates="status", cascade="all, delete-orphan")

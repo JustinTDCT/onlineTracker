@@ -1,13 +1,23 @@
 """Checker service - performs ping, HTTP, HTTPS, and SSL checks."""
 import asyncio
 import hashlib
+import re
 import ssl
 import socket
 from datetime import datetime
-from typing import Optional, Tuple
-from dataclasses import dataclass
+from typing import Optional, Tuple, List
+from dataclasses import dataclass, field
 
 import httpx
+
+
+@dataclass
+class PingResultData:
+    """Individual ping result."""
+    sequence: int
+    success: bool
+    response_time_ms: Optional[float] = None
+    details: Optional[str] = None
 
 
 @dataclass
@@ -18,6 +28,7 @@ class CheckResult:
     details: Optional[str] = None
     body_hash: Optional[str] = None
     ssl_expiry_days: Optional[int] = None
+    ping_results: List[PingResultData] = field(default_factory=list)
 
 
 class CheckerService:
@@ -43,38 +54,99 @@ class CheckerService:
             return CheckResult(status="unknown", details=f"Unknown monitor type: {monitor_type}")
     
     async def _check_ping(self, target: str, timeout: int) -> CheckResult:
-        """Perform a ping check using system ping command."""
+        """Perform ping check with 20 pings, mark down if >50% fail."""
+        ping_count = 20
+        ping_results: List[PingResultData] = []
+        
         try:
-            start = datetime.now()
-            
-            # Use system ping command
+            # Use system ping command with 20 pings
+            # -c 20: send 20 pings
+            # -i 0.2: 200ms interval between pings
+            # -W: timeout per ping
             proc = await asyncio.create_subprocess_exec(
-                "ping", "-c", "1", "-W", str(timeout), target,
+                "ping", "-c", str(ping_count), "-i", "0.2", "-W", str(timeout), target,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout + 2)
             
-            response_time = int((datetime.now() - start).total_seconds() * 1000)
+            # Wait for all pings to complete (20 pings * 0.2s interval + timeout buffer)
+            total_timeout = (ping_count * 0.2) + timeout + 5
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=total_timeout)
             
-            if proc.returncode == 0:
-                # Parse response time from ping output
-                output = stdout.decode()
-                if "time=" in output:
-                    try:
-                        time_str = output.split("time=")[1].split()[0]
-                        response_time = int(float(time_str.rstrip("ms")))
-                    except (IndexError, ValueError):
-                        pass
-                return CheckResult(status="up", response_time_ms=response_time)
-            else:
+            output = stdout.decode()
+            
+            # Parse individual ping results from output
+            # Example line: "64 bytes from 8.8.8.8: icmp_seq=1 ttl=117 time=14.2 ms"
+            ping_pattern = re.compile(r'icmp_seq=(\d+).*?time=(\d+\.?\d*)\s*ms')
+            
+            # Track which sequences we got responses for
+            successful_seqs = {}
+            for match in ping_pattern.finditer(output):
+                seq = int(match.group(1))
+                time_ms = float(match.group(2))
+                successful_seqs[seq] = time_ms
+            
+            # Build results for all 20 pings
+            for seq in range(1, ping_count + 1):
+                if seq in successful_seqs:
+                    ping_results.append(PingResultData(
+                        sequence=seq,
+                        success=True,
+                        response_time_ms=successful_seqs[seq],
+                    ))
+                else:
+                    ping_results.append(PingResultData(
+                        sequence=seq,
+                        success=False,
+                        details="No response",
+                    ))
+            
+            # Calculate statistics
+            successful_pings = [p for p in ping_results if p.success]
+            failed_count = ping_count - len(successful_pings)
+            
+            # Calculate average response time from successful pings
+            avg_response_time = None
+            if successful_pings:
+                avg_response_time = int(sum(p.response_time_ms for p in successful_pings) / len(successful_pings))
+            
+            # Determine status: down if >50% fail
+            fail_threshold = ping_count / 2  # 10 out of 20
+            if failed_count > fail_threshold:
                 return CheckResult(
                     status="down",
-                    response_time_ms=response_time,
-                    details=stderr.decode().strip() or "Ping failed",
+                    response_time_ms=avg_response_time,
+                    details=f"{failed_count}/{ping_count} pings failed",
+                    ping_results=ping_results,
                 )
+            elif failed_count > 0:
+                # Some failures but <=50%, mark as degraded
+                return CheckResult(
+                    status="degraded",
+                    response_time_ms=avg_response_time,
+                    details=f"{failed_count}/{ping_count} pings failed",
+                    ping_results=ping_results,
+                )
+            else:
+                return CheckResult(
+                    status="up",
+                    response_time_ms=avg_response_time,
+                    ping_results=ping_results,
+                )
+                
         except asyncio.TimeoutError:
-            return CheckResult(status="down", details="Ping timeout")
+            # All pings timed out
+            for seq in range(1, ping_count + 1):
+                ping_results.append(PingResultData(
+                    sequence=seq,
+                    success=False,
+                    details="Timeout",
+                ))
+            return CheckResult(
+                status="down",
+                details="Ping timeout",
+                ping_results=ping_results,
+            )
         except Exception as e:
             return CheckResult(status="unknown", details=str(e))
     

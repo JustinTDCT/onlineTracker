@@ -10,7 +10,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import async_session
-from ..models import Monitor, MonitorStatus, Setting
+from ..models import Monitor, MonitorStatus, PingResult, Setting
 from ..models.settings import DEFAULT_SETTINGS
 from .checker import checker_service
 from .alerter import alerter_service
@@ -117,6 +117,19 @@ class SchedulerService:
                 ssl_expiry_days=check_result.ssl_expiry_days,
             )
             session.add(new_status)
+            await session.flush()  # Get the new_status.id
+            
+            # Record individual ping results if this is a ping monitor
+            if monitor.type == "ping" and check_result.ping_results:
+                for ping_data in check_result.ping_results:
+                    ping_result = PingResult(
+                        status_id=new_status.id,
+                        sequence=ping_data.sequence,
+                        success=ping_data.success,
+                        response_time_ms=ping_data.response_time_ms,
+                        details=ping_data.details,
+                    )
+                    session.add(ping_result)
             
             # Check for state change and trigger alert
             if last_status and last_status.status != check_result.status:
