@@ -56,6 +56,15 @@ async def _run_migrations(conn):
     except Exception:
         # Column already exists
         pass
+    
+    # Migration: Add channel column to alerts if missing
+    try:
+        await conn.execute(text(
+            "ALTER TABLE alerts ADD COLUMN channel TEXT DEFAULT 'webhook'"
+        ))
+    except Exception:
+        # Column already exists
+        pass
 
 
 async def close_db():
