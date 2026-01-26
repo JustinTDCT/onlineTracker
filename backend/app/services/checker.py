@@ -218,21 +218,25 @@ class CheckerService:
     def _get_ssl_expiry(self, host: str, port: int) -> Optional[int]:
         """Get SSL certificate expiry in days (blocking operation)."""
         try:
+            # Create context that doesn't verify certificate chain
+            # We just want to read the expiry date, not validate trust
             context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            
             with socket.create_connection((host, port), timeout=10) as sock:
                 with context.wrap_socket(sock, server_hostname=host) as ssock:
-                    cert = ssock.getpeercert()
-                    if not cert:
+                    # Use getpeercert(binary_form=True) with CERT_NONE since
+                    # getpeercert() returns empty dict when not validating
+                    cert_der = ssock.getpeercert(binary_form=True)
+                    if not cert_der:
                         return None
                     
-                    # Parse expiry date
-                    expiry_str = cert.get("notAfter")
-                    if not expiry_str:
-                        return None
-                    
-                    # Format: 'Mar 15 12:00:00 2026 GMT'
-                    expiry = datetime.strptime(expiry_str, "%b %d %H:%M:%S %Y %Z")
-                    days_remaining = (expiry - datetime.utcnow()).days
+                    # Parse the DER certificate to get expiry
+                    from cryptography import x509
+                    cert = x509.load_der_x509_certificate(cert_der)
+                    expiry = cert.not_valid_after_utc
+                    days_remaining = (expiry - datetime.now(expiry.tzinfo)).days
                     return days_remaining
         except Exception:
             return None
