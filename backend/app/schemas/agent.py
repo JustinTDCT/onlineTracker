@@ -8,6 +8,7 @@ class AgentRegister(BaseModel):
     """Schema for agent registration request."""
     uuid: str = Field(..., min_length=36, max_length=36)
     secret_hash: str = Field(..., min_length=64, max_length=64)  # SHA-256 hash
+    name: Optional[str] = None  # Friendly name from AGENT_NAME env var
 
 
 class AgentResponse(BaseModel):

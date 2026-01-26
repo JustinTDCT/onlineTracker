@@ -24,6 +24,7 @@ services:
     container_name: onlinetracker-agent
     environment:
       - MODE=agent
+      - AGENT_NAME=TAB2
       - SERVER_HOST=onlinetracker-server
       - COMS_PORT=8000
       - SHARED_SECRET=test-secret-change-me

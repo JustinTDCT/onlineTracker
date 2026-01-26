@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Agent mode: shared secret for authentication
     shared_secret: str | None = None
     
+    # Agent mode: friendly name for this agent
+    agent_name: str | None = None
+    
     # Path for SQLite database storage
     data_path: str = "/data"
     

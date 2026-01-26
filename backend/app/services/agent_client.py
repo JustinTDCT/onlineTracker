@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import socket
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -46,9 +47,10 @@ class AgentClientService:
     
     def log_uuid_banner(self):
         """Log the agent UUID prominently for easy copying."""
+        name_line = f"  AGENT NAME: {self.agent_name}\n" if self.agent_name else ""
         banner = f"""
 ================================================================================
-  AGENT UUID: {self.agent_uuid}
+{name_line}  AGENT UUID: {self.agent_uuid}
   
   Add this UUID to the allowed agents list in your OnlineTracker server settings
   before this agent can register and start monitoring.
@@ -72,6 +74,17 @@ class AgentClientService:
             raise ValueError("SHARED_SECRET not configured")
         return hashlib.sha256(settings.shared_secret.encode()).hexdigest()
     
+    @property
+    def agent_name(self) -> Optional[str]:
+        """Get the agent's friendly name from env var or hostname."""
+        if settings.agent_name:
+            return settings.agent_name
+        # Fall back to hostname
+        try:
+            return socket.gethostname()
+        except Exception:
+            return None
+    
     async def register(self) -> bool:
         """Register this agent with the server."""
         if not settings.server_host or not settings.shared_secret:
@@ -85,6 +98,7 @@ class AgentClientService:
                     json={
                         "uuid": self.agent_uuid,
                         "secret_hash": self.secret_hash,
+                        "name": self.agent_name,
                     },
                 )
                 

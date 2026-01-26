@@ -72,13 +72,15 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
     # Create new agent - auto-approve since it passed both auth checks
     agent = Agent(
         id=data.uuid,
+        name=data.name,  # Name from AGENT_NAME env var
         secret_hash=data.secret_hash,
         approved=1,  # Auto-approved (passed UUID allowlist and secret check)
     )
     db.add(agent)
     await db.commit()
     
-    logger.info(f"Agent registered and auto-approved: {data.uuid}")
+    agent_display = data.name or data.uuid[:8]
+    logger.info(f"Agent registered and auto-approved: {agent_display} ({data.uuid})")
     return {"status": "registered", "message": "Approved"}
 
 
