@@ -26,6 +26,7 @@ services:
 
   # Test agent instance
   # To use: set shared secret and allowed UUIDs in Settings first
+  # COMS_PORT should match the server's web/API port (default 8000)
   onlinetracker-agent:
     build: .
     container_name: onlinetracker-agent
@@ -33,7 +34,7 @@ services:
       - MODE=agent
       - AGENT_NAME=TAB2
       - SERVER_HOST=onlinetracker-server
-      - COMS_PORT=19443
+      - COMS_PORT=8000
       - SHARED_SECRET=test-secret-change-me
     volumes:
       - onlinetracker-agent-data:/data
