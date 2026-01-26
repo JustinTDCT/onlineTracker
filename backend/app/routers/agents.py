@@ -12,6 +12,7 @@ from ..database import get_db
 from ..models import Agent, Monitor, MonitorStatus, Setting, PendingAgent
 from ..models.settings import DEFAULT_SETTINGS
 from ..schemas.agent import AgentRegister, AgentResponse, AgentApproval, AgentReport, PendingAgentResponse
+from ..services.alerter import alerter_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -305,7 +306,7 @@ async def report_results(data: AgentReport, db: AsyncSession = Depends(get_db)):
     # Update last seen
     agent.last_seen = datetime.utcnow()
     
-    # Store results
+    # Store results and check for alerts
     for check in data.results:
         # Verify monitor belongs to this agent
         monitor_result = await db.execute(
@@ -317,6 +318,17 @@ async def report_results(data: AgentReport, db: AsyncSession = Depends(get_db)):
         monitor = monitor_result.scalar_one_or_none()
         
         if monitor:
+            # Get previous status for alert comparison
+            prev_status_result = await db.execute(
+                select(MonitorStatus)
+                .where(MonitorStatus.monitor_id == check.monitor_id)
+                .order_by(MonitorStatus.checked_at.desc())
+                .limit(1)
+            )
+            prev_status_record = prev_status_result.scalar_one_or_none()
+            old_status = prev_status_record.status if prev_status_record else None
+            
+            # Store new status
             status = MonitorStatus(
                 monitor_id=check.monitor_id,
                 status=check.status,
@@ -325,6 +337,18 @@ async def report_results(data: AgentReport, db: AsyncSession = Depends(get_db)):
                 checked_at=check.checked_at,
             )
             db.add(status)
+            
+            # Trigger alert if status changed
+            try:
+                await alerter_service.send_alert(
+                    db,
+                    monitor,
+                    check.status,
+                    details=check.details,
+                    old_status=old_status,
+                )
+            except Exception as e:
+                logger.error(f"Failed to send alert for monitor {monitor.name}: {e}")
     
     await db.commit()
     
