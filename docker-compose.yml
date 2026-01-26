@@ -1,5 +1,12 @@
 # OnlineTracker Docker Compose
 # Server and agent deployment
+#
+# Host ports are configurable via environment variables:
+#   HOST_WEB_PORT - Web UI port (default: 8000)
+#   HOST_COMS_PORT - Agent communication port (default: 19443)
+#
+# Example: HOST_WEB_PORT=9000 docker compose up -d
+# Or create a .env file with: HOST_WEB_PORT=9000
 
 services:
   # Main server instance
@@ -11,8 +18,8 @@ services:
       - WEB_PORT=8000
       - COMS_PORT=19443
     ports:
-      - "8000:8000"      # Web UI
-      - "19443:19443"    # Agent communication
+      - "${HOST_WEB_PORT:-8000}:8000"      # Web UI
+      - "${HOST_COMS_PORT:-19443}:19443"   # Agent communication
     volumes:
       - onlinetracker-data:/data
     restart: unless-stopped

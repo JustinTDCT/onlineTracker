@@ -17,13 +17,30 @@ A Docker-based service monitoring system with support for distributed agents.
 
 ```bash
 # Build and start the server
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 Access the web UI at `http://localhost:8000`
+
+#### Custom Ports
+
+If port 8000 is already in use, you can configure host ports:
+
+```bash
+# Option 1: Environment variable
+HOST_WEB_PORT=9000 docker compose up -d
+
+# Option 2: Create a .env file
+echo "HOST_WEB_PORT=9000" > .env
+docker compose up -d
+```
+
+Available port variables:
+- `HOST_WEB_PORT` - Web UI port (default: 8000)
+- `HOST_COMS_PORT` - Agent communication port (default: 19443)
 
 ### Using Docker directly
 
