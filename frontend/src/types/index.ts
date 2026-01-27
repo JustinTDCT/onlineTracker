@@ -154,6 +154,13 @@ export interface Settings {
   smtp_use_tls: boolean;
   alert_email_from?: string;
   alert_email_to?: string;
+  
+  // Push notifications (iOS APNs)
+  push_alerts_enabled: boolean;
+  apns_key_id?: string;
+  apns_team_id?: string;
+  apns_bundle_id?: string;
+  apns_use_sandbox: boolean;
 }
 
 // Monitor defaults from system settings

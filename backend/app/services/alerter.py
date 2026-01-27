@@ -1,4 +1,4 @@
-"""Alerter service - sends webhook and email notifications on state changes."""
+"""Alerter service - sends webhook, email, and push notifications on state changes."""
 import json
 import logging
 from datetime import datetime, timedelta
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Monitor, Alert, Setting, MonitorStatus
 from .email_sender import email_sender_service, EmailConfig
+from .push_sender import push_sender_service, PushConfig
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,13 @@ class AlerterService:
             "smtp_use_tls": "1",
             "alert_email_from": "",
             "alert_email_to": "",
+            # Push notification settings
+            "push_alerts_enabled": "0",
+            "apns_key_path": "",
+            "apns_key_id": "",
+            "apns_team_id": "",
+            "apns_bundle_id": "",
+            "apns_use_sandbox": "1",
         }
         
         for setting in settings_list:
@@ -238,6 +246,13 @@ class AlerterService:
             await self._send_email_alert(
                 session, monitor, new_status, details, settings, history, agent_name
             )
+        
+        # Send push notification
+        push_enabled = settings.get("push_alerts_enabled", "0") == "1"
+        if push_enabled:
+            await self._send_push_alert(
+                session, monitor, new_status, details, settings
+            )
     
     async def _send_webhook_alert(
         self,
@@ -325,6 +340,50 @@ class AlerterService:
         except Exception as e:
             logger.error(f"Failed to send webhook: {e}")
             return False
+    
+    async def _send_push_alert(
+        self,
+        session: AsyncSession,
+        monitor: Monitor,
+        new_status: str,
+        details: Optional[str],
+        settings: dict,
+    ):
+        """Send a push notification alert to all registered devices."""
+        # Configure push sender with current settings
+        config = PushConfig(
+            enabled=settings.get("push_alerts_enabled", "0") == "1",
+            key_path=settings.get("apns_key_path", ""),
+            key_id=settings.get("apns_key_id", ""),
+            team_id=settings.get("apns_team_id", ""),
+            bundle_id=settings.get("apns_bundle_id", ""),
+            use_sandbox=settings.get("apns_use_sandbox", "1") == "1",
+        )
+        push_sender_service.configure(config)
+        
+        # Send to all devices
+        success_count, failure_count = await push_sender_service.send_monitor_alert(
+            session=session,
+            monitor_name=monitor.name,
+            monitor_id=monitor.id,
+            status=new_status,
+            details=details,
+        )
+        
+        # Record alert
+        total_sent = success_count + failure_count
+        if total_sent > 0:
+            alert = Alert(
+                monitor_id=monitor.id,
+                alert_type=new_status,
+                channel="push",
+                payload=json.dumps({
+                    "devices_success": success_count,
+                    "devices_failed": failure_count,
+                }),
+                success=1 if success_count > 0 else 0,
+            )
+            session.add(alert)
     
     async def send_ssl_warning(
         self,

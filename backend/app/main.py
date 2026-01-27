@@ -11,7 +11,7 @@ import os
 
 from .config import settings
 from .database import init_db, close_db
-from .routers import monitors_router, agents_router, settings_router, status_router
+from .routers import monitors_router, agents_router, settings_router, status_router, devices_router
 from .services.scheduler import scheduler_service
 from .services.agent_client import agent_client
 
@@ -142,6 +142,7 @@ def create_app() -> FastAPI:
     app.include_router(agents_router)
     app.include_router(settings_router)
     app.include_router(status_router)
+    app.include_router(devices_router)
     
     # Health check endpoint
     @app.get("/health")

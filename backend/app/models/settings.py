@@ -57,4 +57,12 @@ DEFAULT_SETTINGS = {
     "smtp_use_tls": "1",  # 0 or 1
     "alert_email_from": "",
     "alert_email_to": "",
+    
+    # Push notification settings (iOS APNs)
+    "push_alerts_enabled": "0",  # 0 or 1
+    "apns_key_path": "",  # Path to .p8 key file
+    "apns_key_id": "",  # Key ID from Apple
+    "apns_team_id": "",  # Team ID from Apple
+    "apns_bundle_id": "",  # App bundle identifier
+    "apns_use_sandbox": "1",  # 0 for production, 1 for sandbox/development
 }

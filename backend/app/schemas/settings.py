@@ -45,6 +45,13 @@ class SettingsResponse(BaseModel):
     smtp_use_tls: bool = True
     alert_email_from: Optional[str] = None
     alert_email_to: Optional[str] = None
+    
+    # Push notification settings (iOS APNs)
+    push_alerts_enabled: bool = False
+    apns_key_id: Optional[str] = None
+    apns_team_id: Optional[str] = None
+    apns_bundle_id: Optional[str] = None
+    apns_use_sandbox: bool = True
 
 
 class SettingsUpdate(BaseModel):
@@ -89,3 +96,10 @@ class SettingsUpdate(BaseModel):
     smtp_use_tls: Optional[bool] = None
     alert_email_from: Optional[str] = None
     alert_email_to: Optional[str] = None
+    
+    # Push notification settings (iOS APNs)
+    push_alerts_enabled: Optional[bool] = None
+    apns_key_id: Optional[str] = None
+    apns_team_id: Optional[str] = None
+    apns_bundle_id: Optional[str] = None
+    apns_use_sandbox: Optional[bool] = None

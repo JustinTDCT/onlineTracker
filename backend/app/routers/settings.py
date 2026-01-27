@@ -126,6 +126,13 @@ def _build_settings_response(settings_dict: dict) -> SettingsResponse:
         smtp_use_tls=_bool_from_str(settings_dict.get("smtp_use_tls", "1")),
         alert_email_from=settings_dict.get("alert_email_from") or None,
         alert_email_to=settings_dict.get("alert_email_to") or None,
+        
+        # Push notifications
+        push_alerts_enabled=_bool_from_str(settings_dict.get("push_alerts_enabled", "0")),
+        apns_key_id=settings_dict.get("apns_key_id") or None,
+        apns_team_id=settings_dict.get("apns_team_id") or None,
+        apns_bundle_id=settings_dict.get("apns_bundle_id") or None,
+        apns_use_sandbox=_bool_from_str(settings_dict.get("apns_use_sandbox", "1")),
     )
 
 
