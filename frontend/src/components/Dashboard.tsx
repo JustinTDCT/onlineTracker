@@ -351,67 +351,70 @@ export default function Dashboard() {
                   <div
                     key={monitor.id}
                     onClick={() => navigate(`/monitor/${monitor.id}`)}
-                    className="clickable-row px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center gap-4"
+                    className="clickable-row px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   >
-                    {/* Status icon */}
-                    <div className={`p-2 rounded-lg shrink-0 ${statusBgColor(monitor.latest_status?.status)}`}>
-                      {statusIcon(monitor.latest_status?.status)}
-                    </div>
-                    
-                    {/* Name, description, target */}
-                    <div className="min-w-0 w-48 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-900 dark:text-white truncate">{monitor.name}</p>
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded shrink-0">
-                          {monitor.type.toUpperCase()}
-                        </span>
+                    {/* Row 1: Status icon + Name + Type tag (full width, no truncation) */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`p-2 rounded-lg shrink-0 ${statusBgColor(monitor.latest_status?.status)}`}>
+                        {statusIcon(monitor.latest_status?.status)}
                       </div>
-                      {monitor.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{monitor.description}</p>
-                      )}
-                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{monitor.target}</p>
-                    </div>
-                    
-                    {/* Agent column */}
-                    <div className="shrink-0 w-20 text-center">
-                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                        {getAgentDisplayName(monitor.agent_id)}
+                      <h3 className="font-medium text-gray-900 dark:text-white">{monitor.name}</h3>
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded shrink-0">
+                        {monitor.type.toUpperCase()}
                       </span>
                     </div>
                     
-                    {/* Response column */}
-                    <div className="shrink-0 w-20 text-center">
-                      {monitor.type === 'ssl' ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Clock className="h-4 w-4 text-gray-400" />
+                    {/* Row 2: Description/target, Agent, Response, Graph, Status */}
+                    <div className="flex items-center gap-4 pl-12">
+                      {/* Description and target */}
+                      <div className="min-w-0 w-64 shrink-0">
+                        {monitor.description && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{monitor.description}</p>
+                        )}
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{monitor.target}</p>
+                      </div>
+                      
+                      {/* Agent column */}
+                      <div className="shrink-0 w-20 text-center">
+                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                          {getAgentDisplayName(monitor.agent_id)}
+                        </span>
+                      </div>
+                      
+                      {/* Response column */}
+                      <div className="shrink-0 w-20 text-center">
+                        {monitor.type === 'ssl' ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <Clock className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                              {monitor.latest_status?.ssl_expiry_days !== undefined
+                                ? `${monitor.latest_status.ssl_expiry_days}d`
+                                : '-'}
+                            </span>
+                          </div>
+                        ) : (
                           <span className="text-sm text-gray-600 dark:text-gray-300">
-                            {monitor.latest_status?.ssl_expiry_days !== undefined
-                              ? `${monitor.latest_status.ssl_expiry_days}d`
+                            {monitor.latest_status?.response_time_ms !== undefined
+                              ? `${monitor.latest_status.response_time_ms}ms`
                               : '-'}
                           </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-600 dark:text-gray-300">
-                          {monitor.latest_status?.response_time_ms !== undefined
-                            ? `${monitor.latest_status.response_time_ms}ms`
-                            : '-'}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Mini status graph - takes remaining space */}
-                    <div className="flex-1 min-w-0">
-                      <MiniStatusGraph history={monitor.history} />
-                    </div>
-                    
-                    {/* Status and uptime */}
-                    <div className="text-right shrink-0 w-24">
-                      <p className={`font-medium ${statusColor(monitor.latest_status?.status)}`}>
-                        {monitor.latest_status?.status
-                          ? monitor.latest_status.status.charAt(0).toUpperCase() + monitor.latest_status.status.slice(1)
-                          : 'Unknown'}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{uptime.toFixed(1)}%</p>
+                        )}
+                      </div>
+                      
+                      {/* Mini status graph - takes remaining space */}
+                      <div className="flex-1 min-w-0">
+                        <MiniStatusGraph history={monitor.history} />
+                      </div>
+                      
+                      {/* Status and uptime */}
+                      <div className="text-right shrink-0 w-24">
+                        <p className={`font-medium ${statusColor(monitor.latest_status?.status)}`}>
+                          {monitor.latest_status?.status
+                            ? monitor.latest_status.status.charAt(0).toUpperCase() + monitor.latest_status.status.slice(1)
+                            : 'Unknown'}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{uptime.toFixed(1)}%</p>
+                      </div>
                     </div>
                   </div>
                 );
