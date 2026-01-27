@@ -13,6 +13,7 @@ from ..models import Agent, Monitor, MonitorStatus, Setting, PendingAgent
 from ..models.settings import DEFAULT_SETTINGS
 from ..schemas.agent import AgentRegister, AgentResponse, AgentApproval, AgentReport, PendingAgentResponse
 from ..services.alerter import alerter_service
+from ..utils.db_utils import retry_on_lock
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -47,7 +48,7 @@ async def store_pending_agent(db: AsyncSession, uuid: str, name: str | None, sec
         )
         db.add(pending)
     
-    await db.commit()
+    await retry_on_lock(db.commit)
 
 
 @router.post("/register", status_code=202)
@@ -102,7 +103,7 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
         pending = (await db.execute(select(PendingAgent).where(PendingAgent.uuid == data.uuid))).scalar_one_or_none()
         if pending:
             await db.delete(pending)
-            await db.commit()
+            await retry_on_lock(db.commit)
         return {"status": "already_registered", "approved": existing.status}
     
     # Create new agent - auto-approve since it passed both auth checks
@@ -119,7 +120,7 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
     if pending:
         await db.delete(pending)
     
-    await db.commit()
+    await retry_on_lock(db.commit)
     
     agent_display = data.name or data.uuid[:8]
     logger.info(f"Agent registered and auto-approved: {agent_display} ({data.uuid})")
@@ -203,7 +204,7 @@ async def approve_pending_agent(uuid: str, db: AsyncSession = Depends(get_db)):
     
     # Remove from pending
     await db.delete(pending)
-    await db.commit()
+    await retry_on_lock(db.commit)
     
     logger.info(f"Pending agent approved and added to allowed list: {uuid}")
     return {"status": "approved", "uuid": uuid, "message": "Agent will register on next connection attempt"}
@@ -219,7 +220,7 @@ async def dismiss_pending_agent(uuid: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Pending agent not found")
     
     await db.delete(pending)
-    await db.commit()
+    await retry_on_lock(db.commit)
     
     logger.info(f"Pending agent dismissed: {uuid}")
 
@@ -266,7 +267,7 @@ async def approve_agent(
     if data.name:
         agent.name = data.name
     
-    await db.commit()
+    await retry_on_lock(db.commit)
     
     return {"status": "approved" if data.approved else "rejected"}
 
@@ -281,7 +282,7 @@ async def delete_agent(agent_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Agent not found")
     
     await db.delete(agent)
-    await db.commit()
+    await retry_on_lock(db.commit)
 
 
 @router.post("/report")
@@ -350,7 +351,7 @@ async def report_results(data: AgentReport, db: AsyncSession = Depends(get_db)):
             except Exception as e:
                 logger.error(f"Failed to send alert for monitor {monitor.name}: {e}")
     
-    await db.commit()
+    await retry_on_lock(db.commit)
     
     return {"status": "ok", "received": len(data.results)}
 

@@ -9,6 +9,7 @@ from ..models import Setting
 from ..models.settings import DEFAULT_SETTINGS
 from ..schemas.settings import SettingsResponse, SettingsUpdate
 from ..services.email_sender import email_sender_service, EmailConfig
+from ..utils.db_utils import retry_on_lock
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -96,7 +97,7 @@ async def update_settings(update: SettingsUpdate, db: AsyncSession = Depends(get
                 setting = Setting(key=key, value=store_value)
                 db.add(setting)
     
-    await db.commit()
+    await retry_on_lock(db.commit)
     
     # Return updated settings
     settings_dict = await get_all_settings(db)

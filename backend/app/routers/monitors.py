@@ -22,6 +22,7 @@ from ..schemas.monitor import (
 )
 from ..schemas.status import MonitorResult, ResultsPage
 from ..services.checker import checker_service
+from ..utils.db_utils import retry_on_lock
 
 import httpx
 from datetime import datetime as dt
@@ -95,7 +96,12 @@ async def create_monitor(monitor: MonitorCreate, db: AsyncSession = Depends(get_
         agent_id=monitor.agent_id if monitor.agent_id else None,
     )
     db.add(db_monitor)
-    await db.commit()
+    
+    # Use retry logic for commit to handle database lock contention
+    async def do_commit():
+        await db.commit()
+    
+    await retry_on_lock(do_commit)
     await db.refresh(db_monitor)
     
     return MonitorResponse(
@@ -188,7 +194,11 @@ async def update_monitor(
         # Empty string means unassign from agent (server-side monitoring)
         monitor.agent_id = update.agent_id if update.agent_id else None
     
-    await db.commit()
+    # Use retry logic for commit to handle database lock contention
+    async def do_commit():
+        await db.commit()
+    
+    await retry_on_lock(do_commit)
     await db.refresh(monitor)
     
     return MonitorResponse(
@@ -215,7 +225,12 @@ async def delete_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Monitor not found")
     
     await db.delete(monitor)
-    await db.commit()
+    
+    # Use retry logic for commit to handle database lock contention
+    async def do_commit():
+        await db.commit()
+    
+    await retry_on_lock(do_commit)
 
 
 @router.post("/{monitor_id}/test", response_model=MonitorTestResponse)

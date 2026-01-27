@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import async_session
 from ..models import Monitor, MonitorStatus, PingResult, Setting
 from ..models.settings import DEFAULT_SETTINGS
+from ..utils.db_utils import retry_on_lock
 from .checker import checker_service
 from .alerter import alerter_service
 
@@ -62,20 +63,31 @@ class SchedulerService:
     async def _run_checks(self):
         """Run all pending checks."""
         try:
+            # First, get the list of monitor IDs to check (read-only, short lock)
             async with async_session() as session:
-                # Get all enabled server-side monitors
                 result = await session.execute(
-                    select(Monitor).where(
+                    select(Monitor.id).where(
                         Monitor.enabled == 1,
                         Monitor.agent_id.is_(None),  # Server-side only
                     )
                 )
-                monitors = result.scalars().all()
-                
-                for monitor in monitors:
-                    await self._check_monitor(session, monitor)
-                
-                await session.commit()
+                monitor_ids = [row[0] for row in result.fetchall()]
+            
+            # Check each monitor in its own session to minimize lock duration
+            for monitor_id in monitor_ids:
+                try:
+                    async with async_session() as session:
+                        result = await session.execute(
+                            select(Monitor).where(Monitor.id == monitor_id)
+                        )
+                        monitor = result.scalar_one_or_none()
+                        if monitor:
+                            await self._check_monitor(session, monitor)
+                            await retry_on_lock(session.commit)
+                except Exception as e:
+                    logger.error(f"Error checking monitor {monitor_id}: {e}")
+                    # Continue with next monitor even if one fails
+                    
         except Exception as e:
             logger.error(f"Error running checks: {e}")
     
@@ -155,7 +167,7 @@ class SchedulerService:
                 await session.execute(
                     delete(MonitorStatus).where(MonitorStatus.checked_at < cutoff)
                 )
-                await session.commit()
+                await retry_on_lock(session.commit)
                 logger.info("Cleaned up old status records")
         except Exception as e:
             logger.error(f"Error cleaning up records: {e}")
