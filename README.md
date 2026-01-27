@@ -1,6 +1,6 @@
 # OnlineTracker
 
-**Version 1.1.0**
+**Version 1.2.0**
 
 A Docker-based service monitoring system with support for distributed agents.
 
@@ -9,9 +9,10 @@ A Docker-based service monitoring system with support for distributed agents.
 - **Multiple check types**: Ping, HTTP/HTTPS, SSL certificate monitoring
 - **72-hour status history** with visual graphs (like status.cursor.com)
 - **Monitor detail page**: Click any monitor to view detailed status, uptime histograms (24h/week/month/year), and paginated check results
-- **Webhook alerts** for status changes and SSL expiry warnings
+- **Webhook and email alerts** for status changes and SSL expiry warnings
 - **Agent mode** for distributed monitoring from multiple locations
-- **SQLite database** - no external dependencies
+- **Scalable architecture**: SQLite for simple deployments, PostgreSQL for high-scale
+- **Parallel monitoring**: Concurrent checks for better performance
 
 ## Quick Start
 
@@ -239,6 +240,31 @@ cd frontend
 npm install
 npm run dev
 ```
+
+## Database Options
+
+### SQLite (Default)
+
+SQLite is used by default with no additional configuration. It's optimized with:
+- WAL mode for better concurrency
+- Parallel monitoring checks (up to 5 concurrent)
+- Retry logic for lock contention
+
+Suitable for: Up to ~50-100 monitors with moderate agent count.
+
+### PostgreSQL (High-Scale)
+
+For larger deployments, PostgreSQL provides true concurrent writes:
+
+```bash
+# Option 1: Use the PostgreSQL compose file
+docker compose -f docker-compose.postgres.yml up -d
+
+# Option 2: Set DATABASE_URL environment variable
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/dbname docker compose up -d
+```
+
+Suitable for: 100+ monitors, 10+ agents, high-frequency checks.
 
 ## Architecture
 

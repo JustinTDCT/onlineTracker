@@ -1,8 +1,9 @@
 """Scheduler service - manages periodic monitoring checks."""
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -17,6 +18,9 @@ from .checker import checker_service
 from .alerter import alerter_service
 
 logger = logging.getLogger(__name__)
+
+# Maximum concurrent server-side checks
+MAX_CONCURRENT_CHECKS = 5
 
 
 class SchedulerService:
@@ -34,11 +38,15 @@ class SchedulerService:
         self.scheduler = AsyncIOScheduler()
         
         # Add job to run checks
+        # max_instances=1 prevents job pile-up if checks take longer than interval
+        # misfire_grace_time allows late execution if scheduler was busy
         self.scheduler.add_job(
             self._run_checks,
             trigger=IntervalTrigger(seconds=30),
             id="run_checks",
             replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=30,
         )
         
         # Add job to cleanup old status records
@@ -47,6 +55,7 @@ class SchedulerService:
             trigger=IntervalTrigger(hours=1),
             id="cleanup_old_records",
             replace_existing=True,
+            max_instances=1,
         )
         
         self.scheduler.start()
@@ -61,7 +70,7 @@ class SchedulerService:
             logger.info("Scheduler stopped")
     
     async def _run_checks(self):
-        """Run all pending checks."""
+        """Run all pending checks with parallel execution."""
         try:
             # First, get the list of monitor IDs to check (read-only, short lock)
             async with async_session() as session:
@@ -73,23 +82,35 @@ class SchedulerService:
                 )
                 monitor_ids = [row[0] for row in result.fetchall()]
             
-            # Check each monitor in its own session to minimize lock duration
-            for monitor_id in monitor_ids:
-                try:
-                    async with async_session() as session:
-                        result = await session.execute(
-                            select(Monitor).where(Monitor.id == monitor_id)
-                        )
-                        monitor = result.scalar_one_or_none()
-                        if monitor:
-                            await self._check_monitor(session, monitor)
-                            await retry_on_lock(session.commit)
-                except Exception as e:
-                    logger.error(f"Error checking monitor {monitor_id}: {e}")
-                    # Continue with next monitor even if one fails
+            if not monitor_ids:
+                return
+            
+            # Use semaphore to limit concurrent checks
+            semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHECKS)
+            
+            async def check_with_limit(monitor_id: int):
+                async with semaphore:
+                    await self._check_single_monitor(monitor_id)
+            
+            # Run checks in parallel with concurrency limit
+            await asyncio.gather(*[check_with_limit(mid) for mid in monitor_ids])
                     
         except Exception as e:
             logger.error(f"Error running checks: {e}")
+    
+    async def _check_single_monitor(self, monitor_id: int):
+        """Check a single monitor in its own session."""
+        try:
+            async with async_session() as session:
+                result = await session.execute(
+                    select(Monitor).where(Monitor.id == monitor_id)
+                )
+                monitor = result.scalar_one_or_none()
+                if monitor:
+                    await self._check_monitor(session, monitor)
+                    await retry_on_lock(session.commit)
+        except Exception as e:
+            logger.error(f"Error checking monitor {monitor_id}: {e}")
     
     async def _check_monitor(self, session: AsyncSession, monitor: Monitor):
         """Check a single monitor and record the result."""

@@ -16,6 +16,7 @@ You are an expert Python developer working on the OnlineTracker project. You wri
 6. **CSS/Styling**: All styles should be part of the site central CSS, consult that first before adding any inline styling; if not already present add to the central CSS so site styling can be kept uniform.
 7. **Services**: Restart services as needed.
 8. **Rebuild/Docker**: each time you make a change rebuild the docker image so the change can be tested.
+9. Increment versioning (under the logo in the top right: xx.xx.YY increment YY when you fix a bug, xx.YY.xx increment YY when you add a feature, YY.xx.xx increment YY when breaking chnages occur)
 
 # === END USER INSTRUCTIONS ===
 

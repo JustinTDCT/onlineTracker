@@ -287,7 +287,7 @@ async def delete_agent(agent_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/report")
 async def report_results(data: AgentReport, db: AsyncSession = Depends(get_db)):
-    """Agent reports check results."""
+    """Agent reports check results with optimized batch queries."""
     # Find agent
     result = await db.execute(select(Agent).where(Agent.id == data.uuid))
     agent = result.scalar_one_or_none()
@@ -307,53 +307,82 @@ async def report_results(data: AgentReport, db: AsyncSession = Depends(get_db)):
     # Update last seen
     agent.last_seen = datetime.utcnow()
     
-    # Store results and check for alerts
-    for check in data.results:
-        # Verify monitor belongs to this agent
-        monitor_result = await db.execute(
-            select(Monitor).where(
-                Monitor.id == check.monitor_id,
-                Monitor.agent_id == agent.id,
+    if not data.results:
+        await retry_on_lock(db.commit)
+        return {"status": "ok", "received": 0}
+    
+    # Batch optimization: Fetch all monitors for this agent in one query
+    monitor_ids = [check.monitor_id for check in data.results]
+    monitors_result = await db.execute(
+        select(Monitor).where(
+            Monitor.id.in_(monitor_ids),
+            Monitor.agent_id == agent.id,
+        )
+    )
+    monitors_map = {m.id: m for m in monitors_result.scalars().all()}
+    
+    # Batch optimization: Fetch latest status for each monitor in one query
+    # Using a subquery to get the latest status per monitor
+    from sqlalchemy import func, and_
+    
+    # Get the max checked_at for each monitor_id in the batch
+    subquery = (
+        select(
+            MonitorStatus.monitor_id,
+            func.max(MonitorStatus.checked_at).label("max_checked_at")
+        )
+        .where(MonitorStatus.monitor_id.in_(list(monitors_map.keys())))
+        .group_by(MonitorStatus.monitor_id)
+        .subquery()
+    )
+    
+    latest_statuses_result = await db.execute(
+        select(MonitorStatus)
+        .join(
+            subquery,
+            and_(
+                MonitorStatus.monitor_id == subquery.c.monitor_id,
+                MonitorStatus.checked_at == subquery.c.max_checked_at
             )
         )
-        monitor = monitor_result.scalar_one_or_none()
+    )
+    prev_status_map = {s.monitor_id: s.status for s in latest_statuses_result.scalars().all()}
+    
+    # Process results with pre-fetched data
+    processed = 0
+    for check in data.results:
+        monitor = monitors_map.get(check.monitor_id)
+        if not monitor:
+            continue
         
-        if monitor:
-            # Get previous status for alert comparison
-            prev_status_result = await db.execute(
-                select(MonitorStatus)
-                .where(MonitorStatus.monitor_id == check.monitor_id)
-                .order_by(MonitorStatus.checked_at.desc())
-                .limit(1)
-            )
-            prev_status_record = prev_status_result.scalar_one_or_none()
-            old_status = prev_status_record.status if prev_status_record else None
-            
-            # Store new status
-            status = MonitorStatus(
-                monitor_id=check.monitor_id,
-                status=check.status,
-                response_time_ms=check.response_time_ms,
+        old_status = prev_status_map.get(check.monitor_id)
+        
+        # Store new status
+        status = MonitorStatus(
+            monitor_id=check.monitor_id,
+            status=check.status,
+            response_time_ms=check.response_time_ms,
+            details=check.details,
+            checked_at=check.checked_at,
+        )
+        db.add(status)
+        processed += 1
+        
+        # Trigger alert if status changed
+        try:
+            await alerter_service.send_alert(
+                db,
+                monitor,
+                check.status,
                 details=check.details,
-                checked_at=check.checked_at,
+                old_status=old_status,
             )
-            db.add(status)
-            
-            # Trigger alert if status changed
-            try:
-                await alerter_service.send_alert(
-                    db,
-                    monitor,
-                    check.status,
-                    details=check.details,
-                    old_status=old_status,
-                )
-            except Exception as e:
-                logger.error(f"Failed to send alert for monitor {monitor.name}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to send alert for monitor {monitor.name}: {e}")
     
     await retry_on_lock(db.commit)
     
-    return {"status": "ok", "received": len(data.results)}
+    return {"status": "ok", "received": processed}
 
 
 @router.get("/{agent_id}/monitors")
