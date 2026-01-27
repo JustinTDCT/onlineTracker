@@ -4,6 +4,21 @@ export interface MonitorConfig {
   expected_body_hash?: string;
   expected_content?: string;
   timeout_seconds?: number;
+  
+  // Ping/HTTP/HTTPS settings
+  ping_count?: number;  // Number of pings to send (1-10)
+  
+  // PING thresholds (latency in ms)
+  ping_ok_threshold_ms?: number;
+  ping_degraded_threshold_ms?: number;
+  
+  // HTTP/HTTPS thresholds (latency in ms)
+  http_ok_threshold_ms?: number;
+  http_degraded_threshold_ms?: number;
+  
+  // SSL thresholds (days until expiry)
+  ssl_ok_threshold_days?: number;
+  ssl_warning_threshold_days?: number;
 }
 
 export interface LatestStatus {
@@ -103,6 +118,19 @@ export interface Settings {
   check_interval_seconds: number;
   ssl_warn_days: string;
   
+  // Default thresholds for PING monitors
+  default_ping_count: number;
+  default_ping_ok_threshold_ms: number;
+  default_ping_degraded_threshold_ms: number;
+  
+  // Default thresholds for HTTP/HTTPS monitors
+  default_http_ok_threshold_ms: number;
+  default_http_degraded_threshold_ms: number;
+  
+  // Default thresholds for SSL monitors
+  default_ssl_ok_threshold_days: number;
+  default_ssl_warning_threshold_days: number;
+  
   // Agents
   agent_timeout_minutes: number;
   shared_secret?: string;
@@ -126,6 +154,18 @@ export interface Settings {
   smtp_use_tls: boolean;
   alert_email_from?: string;
   alert_email_to?: string;
+}
+
+// Monitor defaults from system settings
+export interface MonitorDefaults {
+  check_interval: number;
+  ping_count: number;
+  ping_ok_threshold_ms: number;
+  ping_degraded_threshold_ms: number;
+  http_ok_threshold_ms: number;
+  http_degraded_threshold_ms: number;
+  ssl_ok_threshold_days: number;
+  ssl_warning_threshold_days: number;
 }
 
 // Status overview

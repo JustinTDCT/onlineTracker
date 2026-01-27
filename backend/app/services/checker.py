@@ -34,6 +34,13 @@ class CheckResult:
 class CheckerService:
     """Service for performing various monitoring checks."""
     
+    # Default thresholds (can be overridden by config)
+    DEFAULT_PING_COUNT = 5
+    DEFAULT_OK_THRESHOLD_MS = 80
+    DEFAULT_DEGRADED_THRESHOLD_MS = 200
+    DEFAULT_SSL_OK_DAYS = 30
+    DEFAULT_SSL_WARNING_DAYS = 14
+    
     def __init__(self, timeout: int = 10):
         self.timeout = timeout
     
@@ -43,45 +50,59 @@ class CheckerService:
         timeout = config.get("timeout_seconds", self.timeout)
         
         if monitor_type == "ping":
-            return await self._check_ping(target, timeout)
+            return await self._check_ping(target, timeout, config)
         elif monitor_type == "http":
             return await self._check_http(target, config, timeout)
         elif monitor_type == "https":
             return await self._check_http(target, config, timeout, secure=True)
         elif monitor_type == "ssl":
-            return await self._check_ssl(target, timeout)
+            return await self._check_ssl(target, timeout, config)
         else:
             return CheckResult(status="unknown", details=f"Unknown monitor type: {monitor_type}")
     
-    def _get_latency_status(self, avg_response_time: Optional[int]) -> Tuple[str, Optional[str]]:
+    def _get_latency_status(
+        self, 
+        avg_response_time: Optional[int],
+        ok_threshold_ms: int = DEFAULT_OK_THRESHOLD_MS,
+        degraded_threshold_ms: int = DEFAULT_DEGRADED_THRESHOLD_MS,
+    ) -> Tuple[str, Optional[str]]:
         """Determine status based on latency thresholds.
         
         Returns (status, details) tuple.
-        Thresholds: 0-80ms = up, 81-200ms = degraded, 201ms+ = down
         """
         if avg_response_time is None:
             return ("unknown", "No response time data")
         
-        if avg_response_time <= 80:
+        if avg_response_time <= ok_threshold_ms:
             return ("up", None)
-        elif avg_response_time <= 200:
+        elif avg_response_time <= degraded_threshold_ms:
             return ("degraded", f"High latency: {avg_response_time}ms")
         else:
             return ("down", f"Very high latency: {avg_response_time}ms")
     
-    async def _check_ping(self, target: str, timeout: int) -> CheckResult:
-        """Perform ping check with 20 pings.
+    async def _check_ping(self, target: str, timeout: int, config: dict) -> CheckResult:
+        """Perform ping check with configurable ping count.
         
         Status thresholds:
         - Success rate: 76-100% = up, 51-75% = degraded, 50% or lower = down
-        - Latency (if success rate is OK): 0-80ms = up, 81-200ms = degraded, 201ms+ = down
+        - Latency (if success rate is OK): uses configurable thresholds
         """
-        ping_count = 20
+        # Get ping count from config (default 5, max 10, min 1)
+        ping_count = config.get("ping_count", self.DEFAULT_PING_COUNT)
+        if ping_count > 10:
+            ping_count = 10
+        elif ping_count < 1:
+            ping_count = 1
+        
+        # Get latency thresholds from config
+        ok_threshold_ms = config.get("ping_ok_threshold_ms", self.DEFAULT_OK_THRESHOLD_MS)
+        degraded_threshold_ms = config.get("ping_degraded_threshold_ms", self.DEFAULT_DEGRADED_THRESHOLD_MS)
+        
         ping_results: List[PingResultData] = []
         
         try:
-            # Use system ping command with 20 pings
-            # -c 20: send 20 pings
+            # Use system ping command with configurable ping count
+            # -c N: send N pings
             # -i 1: 1 second interval (avoid rate-limiting on iDRACs, switches, etc.)
             # -W: timeout per ping
             proc = await asyncio.create_subprocess_exec(
@@ -90,7 +111,7 @@ class CheckerService:
                 stderr=asyncio.subprocess.PIPE,
             )
             
-            # Wait for all pings to complete (20 pings * 1s interval + timeout buffer)
+            # Wait for all pings to complete (ping_count * 1s interval + timeout buffer)
             total_timeout = ping_count + timeout + 5
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=total_timeout)
             
@@ -107,7 +128,7 @@ class CheckerService:
                 time_ms = float(match.group(2))
                 successful_seqs[seq] = time_ms
             
-            # Build results for all 20 pings
+            # Build results for all pings
             for seq in range(1, ping_count + 1):
                 if seq in successful_seqs:
                     ping_results.append(PingResultData(
@@ -149,8 +170,10 @@ class CheckerService:
                     ping_results=ping_results,
                 )
             else:
-                # Success rate is good (76-100%), now check latency
-                latency_status, latency_details = self._get_latency_status(avg_response_time)
+                # Success rate is good (76-100%), now check latency with configurable thresholds
+                latency_status, latency_details = self._get_latency_status(
+                    avg_response_time, ok_threshold_ms, degraded_threshold_ms
+                )
                 
                 if latency_status == "up":
                     return CheckResult(
@@ -196,7 +219,7 @@ class CheckerService:
         2. Expected status code (if configured) - down if mismatch
         3. Expected body hash (if configured) - degraded if changed
         4. HTTP status code - down if not 2xx/3xx
-        5. Latency thresholds: 0-80ms = up, 81-200ms = degraded, 201ms+ = down
+        5. Latency thresholds: uses configurable thresholds
         """
         # Ensure URL has protocol
         if not target.startswith("http"):
@@ -205,6 +228,10 @@ class CheckerService:
         expected_status = config.get("expected_status")
         expected_hash = config.get("expected_body_hash")
         expected_content = config.get("expected_content")
+        
+        # Get latency thresholds from config
+        ok_threshold_ms = config.get("http_ok_threshold_ms", self.DEFAULT_OK_THRESHOLD_MS)
+        degraded_threshold_ms = config.get("http_degraded_threshold_ms", self.DEFAULT_DEGRADED_THRESHOLD_MS)
         
         try:
             start = datetime.now()
@@ -256,8 +283,10 @@ class CheckerService:
                     body_hash=body_hash,
                 )
             
-            # All content checks passed, now check latency thresholds
-            latency_status, latency_details = self._get_latency_status(response_time)
+            # All content checks passed, now check latency with configurable thresholds
+            latency_status, latency_details = self._get_latency_status(
+                response_time, ok_threshold_ms, degraded_threshold_ms
+            )
             
             if latency_status == "up":
                 return CheckResult(
@@ -280,14 +309,18 @@ class CheckerService:
         except Exception as e:
             return CheckResult(status="unknown", details=str(e))
     
-    async def _check_ssl(self, target: str, timeout: int) -> CheckResult:
+    async def _check_ssl(self, target: str, timeout: int, config: dict) -> CheckResult:
         """Check SSL certificate expiration.
         
-        Status thresholds:
-        - 31+ days = up
-        - 15-30 days = degraded
-        - 14 days or less = down
+        Status thresholds are configurable:
+        - Days >= ok_threshold = up (OK)
+        - Days >= warning_threshold but < ok_threshold = degraded (Warning)
+        - Days < warning_threshold = down
         """
+        # Get SSL thresholds from config
+        ok_threshold_days = config.get("ssl_ok_threshold_days", self.DEFAULT_SSL_OK_DAYS)
+        warning_threshold_days = config.get("ssl_warning_threshold_days", self.DEFAULT_SSL_WARNING_DAYS)
+        
         # Extract hostname and port
         if "://" in target:
             target = target.split("://")[1]
@@ -318,20 +351,24 @@ class CheckerService:
             if expiry_days is None:
                 return CheckResult(status="down", details="Could not get certificate")
             
-            if expiry_days <= 14:
-                # 14 days or less = down
-                if expiry_days <= 0:
-                    details = "Certificate expired"
-                else:
-                    details = f"Certificate expires in {expiry_days} days"
+            if expiry_days <= 0:
+                # Expired
                 return CheckResult(
                     status="down",
                     response_time_ms=response_time,
-                    details=details,
+                    details="Certificate expired",
                     ssl_expiry_days=expiry_days,
                 )
-            elif expiry_days <= 30:
-                # 15-30 days = degraded
+            elif expiry_days < warning_threshold_days:
+                # Below warning threshold = down
+                return CheckResult(
+                    status="down",
+                    response_time_ms=response_time,
+                    details=f"Certificate expires in {expiry_days} days",
+                    ssl_expiry_days=expiry_days,
+                )
+            elif expiry_days < ok_threshold_days:
+                # Between warning and ok threshold = degraded (warning)
                 return CheckResult(
                     status="degraded",
                     response_time_ms=response_time,
@@ -339,7 +376,7 @@ class CheckerService:
                     ssl_expiry_days=expiry_days,
                 )
             else:
-                # 31+ days = up
+                # At or above ok threshold = up
                 return CheckResult(
                     status="up",
                     response_time_ms=response_time,

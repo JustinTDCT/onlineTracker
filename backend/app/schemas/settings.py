@@ -9,6 +9,19 @@ class SettingsResponse(BaseModel):
     check_interval_seconds: int = 60
     ssl_warn_days: str = "30,14,7"  # Comma-separated warning thresholds
     
+    # Default thresholds for PING monitors
+    default_ping_count: int = 5  # Number of pings to send (1-10)
+    default_ping_ok_threshold_ms: int = 80  # Latency <= this = OK
+    default_ping_degraded_threshold_ms: int = 200  # Latency <= this = Degraded, > = Down
+    
+    # Default thresholds for HTTP/HTTPS monitors
+    default_http_ok_threshold_ms: int = 80  # Latency <= this = OK
+    default_http_degraded_threshold_ms: int = 200  # Latency <= this = Degraded, > = Down
+    
+    # Default thresholds for SSL monitors
+    default_ssl_ok_threshold_days: int = 30  # Days >= this = OK
+    default_ssl_warning_threshold_days: int = 14  # Days >= this = Warning, < = Down
+    
     # Agent settings
     agent_timeout_minutes: int = 5
     shared_secret: Optional[str] = None
@@ -39,6 +52,19 @@ class SettingsUpdate(BaseModel):
     # Monitoring settings
     check_interval_seconds: Optional[int] = Field(None, ge=10, le=3600)
     ssl_warn_days: Optional[str] = None
+    
+    # Default thresholds for PING monitors
+    default_ping_count: Optional[int] = Field(None, ge=1, le=10)
+    default_ping_ok_threshold_ms: Optional[int] = Field(None, ge=1, le=10000)
+    default_ping_degraded_threshold_ms: Optional[int] = Field(None, ge=1, le=10000)
+    
+    # Default thresholds for HTTP/HTTPS monitors
+    default_http_ok_threshold_ms: Optional[int] = Field(None, ge=1, le=30000)
+    default_http_degraded_threshold_ms: Optional[int] = Field(None, ge=1, le=30000)
+    
+    # Default thresholds for SSL monitors
+    default_ssl_ok_threshold_days: Optional[int] = Field(None, ge=1, le=365)
+    default_ssl_warning_threshold_days: Optional[int] = Field(None, ge=1, le=365)
     
     # Agent settings
     agent_timeout_minutes: Optional[int] = Field(None, ge=1, le=60)

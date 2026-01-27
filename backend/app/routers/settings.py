@@ -41,6 +41,19 @@ def _build_settings_response(settings_dict: dict) -> SettingsResponse:
         check_interval_seconds=int(settings_dict.get("check_interval_seconds", 60)),
         ssl_warn_days=settings_dict.get("ssl_warn_days", "30,14,7"),
         
+        # Default thresholds for PING monitors
+        default_ping_count=int(settings_dict.get("default_ping_count", 5)),
+        default_ping_ok_threshold_ms=int(settings_dict.get("default_ping_ok_threshold_ms", 80)),
+        default_ping_degraded_threshold_ms=int(settings_dict.get("default_ping_degraded_threshold_ms", 200)),
+        
+        # Default thresholds for HTTP/HTTPS monitors
+        default_http_ok_threshold_ms=int(settings_dict.get("default_http_ok_threshold_ms", 80)),
+        default_http_degraded_threshold_ms=int(settings_dict.get("default_http_degraded_threshold_ms", 200)),
+        
+        # Default thresholds for SSL monitors
+        default_ssl_ok_threshold_days=int(settings_dict.get("default_ssl_ok_threshold_days", 30)),
+        default_ssl_warning_threshold_days=int(settings_dict.get("default_ssl_warning_threshold_days", 14)),
+        
         # Agents
         agent_timeout_minutes=int(settings_dict.get("agent_timeout_minutes", 5)),
         shared_secret=settings_dict.get("shared_secret") or None,

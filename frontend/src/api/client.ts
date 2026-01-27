@@ -9,6 +9,7 @@ import type {
   StatusOverview,
   PollPageResult,
   ResultsPage,
+  MonitorDefaults,
 } from '../types';
 
 const API_BASE = '/api';
@@ -37,6 +38,10 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 // Monitors
 export async function getMonitors(): Promise<Monitor[]> {
   return fetchJson(`${API_BASE}/monitors`);
+}
+
+export async function getMonitorDefaults(): Promise<MonitorDefaults> {
+  return fetchJson(`${API_BASE}/monitors/defaults`);
 }
 
 export async function getMonitor(id: number): Promise<Monitor> {

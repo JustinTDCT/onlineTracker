@@ -10,6 +10,21 @@ class MonitorConfig(BaseModel):
     expected_body_hash: Optional[str] = None  # MD5 hash of expected response
     expected_content: Optional[str] = None  # Text that must be present in response body
     timeout_seconds: int = 10
+    
+    # Ping/HTTP/HTTPS settings
+    ping_count: Optional[int] = None  # Number of pings to send (1-10)
+    
+    # PING thresholds (latency in ms)
+    ping_ok_threshold_ms: Optional[int] = None  # Latency <= this = OK
+    ping_degraded_threshold_ms: Optional[int] = None  # Latency <= this = Degraded, > = Down
+    
+    # HTTP/HTTPS thresholds (latency in ms)
+    http_ok_threshold_ms: Optional[int] = None  # Latency <= this = OK
+    http_degraded_threshold_ms: Optional[int] = None  # Latency <= this = Degraded, > = Down
+    
+    # SSL thresholds (days until expiry)
+    ssl_ok_threshold_days: Optional[int] = None  # Days >= this = OK
+    ssl_warning_threshold_days: Optional[int] = None  # Days >= this = Warning, < = Down
 
 
 class MonitorCreate(BaseModel):

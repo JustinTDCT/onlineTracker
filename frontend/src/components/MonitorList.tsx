@@ -21,8 +21,9 @@ import {
   testMonitor,
   pollPage,
   getAgents,
+  getMonitorDefaults,
 } from '../api/client';
-import type { Monitor, MonitorCreate, MonitorTestResult, Agent } from '../types';
+import type { Monitor, MonitorCreate, MonitorTestResult, Agent, MonitorDefaults } from '../types';
 
 type TypeFilter = 'all' | 'ping' | 'http' | 'ssl';
 
@@ -31,6 +32,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 export default function MonitorList() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [defaults, setDefaults] = useState<MonitorDefaults | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null);
@@ -84,13 +86,15 @@ export default function MonitorList() {
 
   async function loadData() {
     try {
-      const [monitorsData, agentsData] = await Promise.all([
+      const [monitorsData, agentsData, defaultsData] = await Promise.all([
         getMonitors(),
         getAgents(),
+        getMonitorDefaults(),
       ]);
       setMonitors(monitorsData);
       // Only show approved agents
       setAgents(agentsData.filter(a => a.status === 'approved'));
+      setDefaults(defaultsData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -206,6 +210,7 @@ export default function MonitorList() {
         <MonitorForm
           monitor={editingMonitor}
           agents={agents}
+          defaults={defaults}
           onClose={() => {
             setShowForm(false);
             setEditingMonitor(null);
@@ -408,18 +413,19 @@ export default function MonitorList() {
 interface FormProps {
   monitor: Monitor | null;
   agents: Agent[];
+  defaults: MonitorDefaults | null;
   onClose: () => void;
   onSave: (data: MonitorCreate) => Promise<void>;
 }
 
-function MonitorForm({ monitor, agents, onClose, onSave }: FormProps) {
+function MonitorForm({ monitor, agents, defaults, onClose, onSave }: FormProps) {
   const [type, setType] = useState<'ping' | 'http' | 'https' | 'ssl'>(
     monitor?.type || 'ping'
   );
   const [name, setName] = useState(monitor?.name || '');
   const [description, setDescription] = useState(monitor?.description || '');
   const [target, setTarget] = useState(monitor?.target || '');
-  const [interval, setInterval] = useState(monitor?.check_interval || 60);
+  const [interval, setInterval] = useState(monitor?.check_interval || defaults?.check_interval || 60);
   const [enabled, setEnabled] = useState(monitor?.enabled ?? true);
   const [agentId, setAgentId] = useState(monitor?.agent_id || '');
   const [expectedStatus, setExpectedStatus] = useState(
@@ -432,6 +438,32 @@ function MonitorForm({ monitor, agents, onClose, onSave }: FormProps) {
   const [polling, setPolling] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
   const [pollSuccess, setPollSuccess] = useState<string | null>(null);
+  
+  // Threshold states - prefill from monitor config or defaults
+  const [pingCount, setPingCount] = useState(
+    monitor?.config?.ping_count || defaults?.ping_count || 5
+  );
+  const [pingOkThreshold, setPingOkThreshold] = useState(
+    monitor?.config?.ping_ok_threshold_ms || defaults?.ping_ok_threshold_ms || 80
+  );
+  const [pingDegradedThreshold, setPingDegradedThreshold] = useState(
+    monitor?.config?.ping_degraded_threshold_ms || defaults?.ping_degraded_threshold_ms || 200
+  );
+  const [httpOkThreshold, setHttpOkThreshold] = useState(
+    monitor?.config?.http_ok_threshold_ms || defaults?.http_ok_threshold_ms || 80
+  );
+  const [httpDegradedThreshold, setHttpDegradedThreshold] = useState(
+    monitor?.config?.http_degraded_threshold_ms || defaults?.http_degraded_threshold_ms || 200
+  );
+  const [sslOkThreshold, setSslOkThreshold] = useState(
+    monitor?.config?.ssl_ok_threshold_days || defaults?.ssl_ok_threshold_days || 30
+  );
+  const [sslWarningThreshold, setSslWarningThreshold] = useState(
+    monitor?.config?.ssl_warning_threshold_days || defaults?.ssl_warning_threshold_days || 14
+  );
+  
+  // Show advanced options
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   async function handlePollPage() {
     if (!target) return;
@@ -465,6 +497,34 @@ function MonitorForm({ monitor, agents, onClose, onSave }: FormProps) {
     }
     if (expectedContent) {
       config.expected_content = expectedContent;
+    }
+    
+    // Add type-specific thresholds
+    if (type === 'ping') {
+      // Validate ping count
+      let validPingCount = pingCount;
+      if (validPingCount > 10) {
+        validPingCount = 10;
+      } else if (validPingCount < 1) {
+        validPingCount = 1;
+      }
+      config.ping_count = validPingCount;
+      config.ping_ok_threshold_ms = pingOkThreshold;
+      config.ping_degraded_threshold_ms = pingDegradedThreshold;
+    } else if (type === 'http' || type === 'https') {
+      // HTTP/HTTPS also use ping_count for number of requests to average
+      let validPingCount = pingCount;
+      if (validPingCount > 10) {
+        validPingCount = 10;
+      } else if (validPingCount < 1) {
+        validPingCount = 1;
+      }
+      config.ping_count = validPingCount;
+      config.http_ok_threshold_ms = httpOkThreshold;
+      config.http_degraded_threshold_ms = httpDegradedThreshold;
+    } else if (type === 'ssl') {
+      config.ssl_ok_threshold_days = sslOkThreshold;
+      config.ssl_warning_threshold_days = sslWarningThreshold;
     }
 
     await onSave({
@@ -626,6 +686,157 @@ function MonitorForm({ monitor, agents, onClose, onSave }: FormProps) {
               </div>
             </>
           )}
+
+          {/* Advanced Thresholds Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+            >
+              {showAdvanced ? '▼' : '►'} Threshold Settings
+            </button>
+            
+            {showAdvanced && (
+              <div className="mt-4 space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                {/* PING Thresholds */}
+                {type === 'ping' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Number of Pings
+                      </label>
+                      <input
+                        type="number"
+                        value={pingCount}
+                        onChange={(e) => {
+                          let val = parseInt(e.target.value, 10);
+                          if (val > 10) {
+                            val = 10;
+                            alert('Maximum ping count is 10. Setting to 10.');
+                          } else if (val < 1) {
+                            val = 1;
+                            alert('Minimum ping count is 1. Setting to 1.');
+                          }
+                          setPingCount(val);
+                        }}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                        min={1}
+                        max={10}
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Number of pings to send per check (1-10)
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          OK Threshold (ms)
+                        </label>
+                        <input
+                          type="number"
+                          value={pingOkThreshold}
+                          onChange={(e) => setPingOkThreshold(parseInt(e.target.value, 10))}
+                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                          min={1}
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Latency ≤ this = OK
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Degraded Threshold (ms)
+                        </label>
+                        <input
+                          type="number"
+                          value={pingDegradedThreshold}
+                          onChange={(e) => setPingDegradedThreshold(parseInt(e.target.value, 10))}
+                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                          min={1}
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Latency ≤ this = Degraded, &gt; = Down
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+                
+                {/* HTTP/HTTPS Thresholds */}
+                {(type === 'http' || type === 'https') && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        OK Threshold (ms)
+                      </label>
+                      <input
+                        type="number"
+                        value={httpOkThreshold}
+                        onChange={(e) => setHttpOkThreshold(parseInt(e.target.value, 10))}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                        min={1}
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Latency ≤ this = OK
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Degraded Threshold (ms)
+                      </label>
+                      <input
+                        type="number"
+                        value={httpDegradedThreshold}
+                        onChange={(e) => setHttpDegradedThreshold(parseInt(e.target.value, 10))}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                        min={1}
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Latency ≤ this = Degraded, &gt; = Down
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* SSL Thresholds */}
+                {type === 'ssl' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        OK Threshold (days)
+                      </label>
+                      <input
+                        type="number"
+                        value={sslOkThreshold}
+                        onChange={(e) => setSslOkThreshold(parseInt(e.target.value, 10))}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                        min={1}
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Days ≥ this = OK
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Warning Threshold (days)
+                      </label>
+                      <input
+                        type="number"
+                        value={sslWarningThreshold}
+                        onChange={(e) => setSslWarningThreshold(parseInt(e.target.value, 10))}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2"
+                        min={1}
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Days ≥ this = Warning, &lt; = Down
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <input

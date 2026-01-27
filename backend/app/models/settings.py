@@ -21,6 +21,19 @@ DEFAULT_SETTINGS = {
     "check_interval_seconds": "60",
     "ssl_warn_days": "30,14,7",
     
+    # Default thresholds for PING monitors (latency in ms)
+    "default_ping_count": "5",  # Number of pings to send (1-10)
+    "default_ping_ok_threshold_ms": "80",  # Latency <= this = OK
+    "default_ping_degraded_threshold_ms": "200",  # Latency <= this = Degraded, > = Down
+    
+    # Default thresholds for HTTP/HTTPS monitors (latency in ms)
+    "default_http_ok_threshold_ms": "80",  # Latency <= this = OK
+    "default_http_degraded_threshold_ms": "200",  # Latency <= this = Degraded, > = Down
+    
+    # Default thresholds for SSL monitors (days until expiry)
+    "default_ssl_ok_threshold_days": "30",  # Days >= this = OK
+    "default_ssl_warning_threshold_days": "14",  # Days >= this = Warning, < = Down
+    
     # Agent settings
     "agent_timeout_minutes": "5",
     "shared_secret": "",

@@ -15,6 +15,19 @@ export default function SettingsPage() {
   // Form state - Monitoring
   const [checkInterval, setCheckInterval] = useState(60);
   const [sslWarnDays, setSslWarnDays] = useState('30,14,7');
+  
+  // Default thresholds for PING monitors
+  const [defaultPingCount, setDefaultPingCount] = useState(5);
+  const [defaultPingOkThreshold, setDefaultPingOkThreshold] = useState(80);
+  const [defaultPingDegradedThreshold, setDefaultPingDegradedThreshold] = useState(200);
+  
+  // Default thresholds for HTTP/HTTPS monitors
+  const [defaultHttpOkThreshold, setDefaultHttpOkThreshold] = useState(80);
+  const [defaultHttpDegradedThreshold, setDefaultHttpDegradedThreshold] = useState(200);
+  
+  // Default thresholds for SSL monitors
+  const [defaultSslOkThreshold, setDefaultSslOkThreshold] = useState(30);
+  const [defaultSslWarningThreshold, setDefaultSslWarningThreshold] = useState(14);
 
   // Form state - Agents
   const [agentTimeout, setAgentTimeout] = useState(5);
@@ -58,6 +71,14 @@ export default function SettingsPage() {
       // Monitoring
       setCheckInterval(data.check_interval_seconds);
       setSslWarnDays(data.ssl_warn_days);
+      // Default thresholds
+      setDefaultPingCount(data.default_ping_count);
+      setDefaultPingOkThreshold(data.default_ping_ok_threshold_ms);
+      setDefaultPingDegradedThreshold(data.default_ping_degraded_threshold_ms);
+      setDefaultHttpOkThreshold(data.default_http_ok_threshold_ms);
+      setDefaultHttpDegradedThreshold(data.default_http_degraded_threshold_ms);
+      setDefaultSslOkThreshold(data.default_ssl_ok_threshold_days);
+      setDefaultSslWarningThreshold(data.default_ssl_warning_threshold_days);
       // Agents
       setAgentTimeout(data.agent_timeout_minutes);
       setSharedSecret(data.shared_secret || '');
@@ -142,6 +163,14 @@ export default function SettingsPage() {
         // Monitoring
         check_interval_seconds: checkInterval,
         ssl_warn_days: sslWarnDays,
+        // Default thresholds
+        default_ping_count: defaultPingCount,
+        default_ping_ok_threshold_ms: defaultPingOkThreshold,
+        default_ping_degraded_threshold_ms: defaultPingDegradedThreshold,
+        default_http_ok_threshold_ms: defaultHttpOkThreshold,
+        default_http_degraded_threshold_ms: defaultHttpDegradedThreshold,
+        default_ssl_ok_threshold_days: defaultSslOkThreshold,
+        default_ssl_warning_threshold_days: defaultSslWarningThreshold,
         // Agents
         agent_timeout_minutes: agentTimeout,
         shared_secret: sharedSecret || undefined,
@@ -240,32 +269,156 @@ export default function SettingsPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Monitoring Tab */}
         {activeTab === 'monitoring' && (
-          <div className="settings-card">
-            <h2 className="settings-card-title">Monitoring Settings</h2>
+          <div className="space-y-6">
+            <div className="settings-card">
+              <h2 className="settings-card-title">General Settings</h2>
 
-            <div>
-              <label className="settings-label">Default Check Interval (seconds)</label>
-              <input
-                type="number"
-                value={checkInterval}
-                onChange={(e) => setCheckInterval(parseInt(e.target.value, 10))}
-                className="settings-input"
-                min={10}
-                max={3600}
-              />
-              <p className="settings-help">Default interval for new monitors (10-3600 seconds)</p>
+              <div>
+                <label className="settings-label">Default Check Interval (seconds)</label>
+                <input
+                  type="number"
+                  value={checkInterval}
+                  onChange={(e) => setCheckInterval(parseInt(e.target.value, 10))}
+                  className="settings-input"
+                  min={10}
+                  max={3600}
+                />
+                <p className="settings-help">Default interval for new monitors (10-3600 seconds)</p>
+              </div>
+
+              <div>
+                <label className="settings-label">SSL Warning Thresholds (days)</label>
+                <input
+                  type="text"
+                  value={sslWarnDays}
+                  onChange={(e) => setSslWarnDays(e.target.value)}
+                  className="settings-input"
+                  placeholder="30,14,7"
+                />
+                <p className="settings-help">Comma-separated days before expiry to trigger warnings</p>
+              </div>
             </div>
 
-            <div>
-              <label className="settings-label">SSL Warning Thresholds (days)</label>
-              <input
-                type="text"
-                value={sslWarnDays}
-                onChange={(e) => setSslWarnDays(e.target.value)}
-                className="settings-input"
-                placeholder="30,14,7"
-              />
-              <p className="settings-help">Comma-separated days before expiry to trigger warnings</p>
+            {/* PING Thresholds */}
+            <div className="settings-card">
+              <h2 className="settings-card-title">Default PING Thresholds</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                These defaults apply to new PING monitors. Individual monitors can override these values.
+              </p>
+
+              <div>
+                <label className="settings-label">Number of Pings</label>
+                <input
+                  type="number"
+                  value={defaultPingCount}
+                  onChange={(e) => {
+                    let val = parseInt(e.target.value, 10);
+                    if (val > 10) {
+                      val = 10;
+                      alert('Maximum ping count is 10. Setting to 10.');
+                    } else if (val < 1) {
+                      val = 1;
+                      alert('Minimum ping count is 1. Setting to 1.');
+                    }
+                    setDefaultPingCount(val);
+                  }}
+                  className="settings-input"
+                  min={1}
+                  max={10}
+                />
+                <p className="settings-help">Number of pings to send per check (1-10)</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="settings-label">OK Threshold (ms)</label>
+                  <input
+                    type="number"
+                    value={defaultPingOkThreshold}
+                    onChange={(e) => setDefaultPingOkThreshold(parseInt(e.target.value, 10))}
+                    className="settings-input"
+                    min={1}
+                  />
+                  <p className="settings-help">Latency &le; this = OK</p>
+                </div>
+                <div>
+                  <label className="settings-label">Degraded Threshold (ms)</label>
+                  <input
+                    type="number"
+                    value={defaultPingDegradedThreshold}
+                    onChange={(e) => setDefaultPingDegradedThreshold(parseInt(e.target.value, 10))}
+                    className="settings-input"
+                    min={1}
+                  />
+                  <p className="settings-help">Latency &le; this = Degraded, &gt; = Down</p>
+                </div>
+              </div>
+            </div>
+
+            {/* HTTP/HTTPS Thresholds */}
+            <div className="settings-card">
+              <h2 className="settings-card-title">Default HTTP/HTTPS Thresholds</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                These defaults apply to new HTTP/HTTPS monitors. Individual monitors can override these values.
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="settings-label">OK Threshold (ms)</label>
+                  <input
+                    type="number"
+                    value={defaultHttpOkThreshold}
+                    onChange={(e) => setDefaultHttpOkThreshold(parseInt(e.target.value, 10))}
+                    className="settings-input"
+                    min={1}
+                  />
+                  <p className="settings-help">Latency &le; this = OK</p>
+                </div>
+                <div>
+                  <label className="settings-label">Degraded Threshold (ms)</label>
+                  <input
+                    type="number"
+                    value={defaultHttpDegradedThreshold}
+                    onChange={(e) => setDefaultHttpDegradedThreshold(parseInt(e.target.value, 10))}
+                    className="settings-input"
+                    min={1}
+                  />
+                  <p className="settings-help">Latency &le; this = Degraded, &gt; = Down</p>
+                </div>
+              </div>
+            </div>
+
+            {/* SSL Thresholds */}
+            <div className="settings-card">
+              <h2 className="settings-card-title">Default SSL Thresholds</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                These defaults apply to new SSL monitors. Individual monitors can override these values.
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="settings-label">OK Threshold (days)</label>
+                  <input
+                    type="number"
+                    value={defaultSslOkThreshold}
+                    onChange={(e) => setDefaultSslOkThreshold(parseInt(e.target.value, 10))}
+                    className="settings-input"
+                    min={1}
+                  />
+                  <p className="settings-help">Days &ge; this = OK</p>
+                </div>
+                <div>
+                  <label className="settings-label">Warning Threshold (days)</label>
+                  <input
+                    type="number"
+                    value={defaultSslWarningThreshold}
+                    onChange={(e) => setDefaultSslWarningThreshold(parseInt(e.target.value, 10))}
+                    className="settings-input"
+                    min={1}
+                  />
+                  <p className="settings-help">Days &ge; this = Warning, &lt; = Down</p>
+                </div>
+              </div>
             </div>
           </div>
         )}

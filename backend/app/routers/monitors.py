@@ -4,11 +4,13 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Monitor, MonitorStatus
+from ..models import Monitor, MonitorStatus, Setting
+from ..models.settings import DEFAULT_SETTINGS
 from ..schemas.monitor import (
     MonitorCreate,
     MonitorUpdate,
@@ -28,6 +30,50 @@ import httpx
 from datetime import datetime as dt
 
 router = APIRouter(prefix="/api/monitors", tags=["monitors"])
+
+
+class MonitorDefaults(BaseModel):
+    """Default values for new monitors based on system settings."""
+    check_interval: int
+    ping_count: int
+    ping_ok_threshold_ms: int
+    ping_degraded_threshold_ms: int
+    http_ok_threshold_ms: int
+    http_degraded_threshold_ms: int
+    ssl_ok_threshold_days: int
+    ssl_warning_threshold_days: int
+
+
+async def _get_all_settings(db: AsyncSession) -> dict:
+    """Get all settings as a dictionary."""
+    result = await db.execute(select(Setting))
+    settings_list = result.scalars().all()
+    
+    # Start with defaults
+    settings_dict = dict(DEFAULT_SETTINGS)
+    
+    # Override with stored values
+    for setting in settings_list:
+        settings_dict[setting.key] = setting.value
+    
+    return settings_dict
+
+
+@router.get("/defaults", response_model=MonitorDefaults)
+async def get_monitor_defaults(db: AsyncSession = Depends(get_db)):
+    """Get default values for new monitors based on system settings."""
+    settings = await _get_all_settings(db)
+    
+    return MonitorDefaults(
+        check_interval=int(settings.get("check_interval_seconds", 60)),
+        ping_count=int(settings.get("default_ping_count", 5)),
+        ping_ok_threshold_ms=int(settings.get("default_ping_ok_threshold_ms", 80)),
+        ping_degraded_threshold_ms=int(settings.get("default_ping_degraded_threshold_ms", 200)),
+        http_ok_threshold_ms=int(settings.get("default_http_ok_threshold_ms", 80)),
+        http_degraded_threshold_ms=int(settings.get("default_http_degraded_threshold_ms", 200)),
+        ssl_ok_threshold_days=int(settings.get("default_ssl_ok_threshold_days", 30)),
+        ssl_warning_threshold_days=int(settings.get("default_ssl_warning_threshold_days", 14)),
+    )
 
 
 @router.get("", response_model=List[MonitorWithStatus])
