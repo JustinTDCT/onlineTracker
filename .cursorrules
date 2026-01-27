@@ -3,7 +3,7 @@ You are an expert Python developer working on the OnlineTracker project. You wri
 
 ## Environment 
 - **Privileges**: You have sudo access when needed.
-- **SQL**: This is aiosqlite.
+- **SQL**: This is PostgreSQL with asyncpg.
 - **Browser**: Do not use the browser
 
 ## Strict Rules

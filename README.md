@@ -1,6 +1,6 @@
 # OnlineTracker
 
-**Version 1.2.0**
+**Version 2.0.0**
 
 A Docker-based service monitoring system with support for distributed agents.
 
@@ -11,15 +11,15 @@ A Docker-based service monitoring system with support for distributed agents.
 - **Monitor detail page**: Click any monitor to view detailed status, uptime histograms (24h/week/month/year), and paginated check results
 - **Webhook and email alerts** for status changes and SSL expiry warnings
 - **Agent mode** for distributed monitoring from multiple locations
-- **Scalable architecture**: SQLite for simple deployments, PostgreSQL for high-scale
-- **Parallel monitoring**: Concurrent checks for better performance
+- **PostgreSQL database**: Scalable, concurrent writes, production-ready
+- **Parallel monitoring**: Up to 5 concurrent checks for better performance
 
 ## Quick Start
 
 ### Using Docker Compose
 
 ```bash
-# Build and start the server
+# Build and start the server (includes PostgreSQL)
 docker compose up -d
 
 # View logs
@@ -45,21 +45,6 @@ Available port variables:
 - `HOST_WEB_PORT` - Web UI port (default: 8000)
 - `HOST_COMS_PORT` - Agent communication port (default: 19443)
 
-### Using Docker directly
-
-```bash
-# Build the image
-docker build -t onlinetracker .
-
-# Run in server mode
-docker run -d \
-  --name onlinetracker \
-  -p 8000:8000 \
-  -p 19443:19443 \
-  -v onlinetracker-data:/data \
-  onlinetracker
-```
-
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -67,9 +52,18 @@ docker run -d \
 | `MODE` | `server` | Run mode: `server` or `agent` |
 | `WEB_PORT` | `8000` | Web UI + Admin API port (server mode) |
 | `COMS_PORT` | `19443` | Agent-only API port (server mode) / Server port to connect to (agent mode) |
-| `DATA_PATH` | `/data` | SQLite database location |
+| `DATABASE_URL` | (see below) | PostgreSQL connection string |
 | `SERVER_HOST` | - | Agent mode: server hostname |
 | `SHARED_SECRET` | - | Agent mode: authentication secret |
+
+### Database URL
+
+Default: `postgresql+asyncpg://onlinetracker:onlinetracker@postgres:5432/onlinetracker`
+
+For external PostgreSQL:
+```bash
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/dbname docker compose up -d
+```
 
 ## Port Architecture
 
@@ -161,7 +155,6 @@ docker run -d \
   -e SERVER_HOST=your-server-hostname \
   -e COMS_PORT=19443 \
   -e SHARED_SECRET=your-secret-key \
-  -v agent-data:/data \
   onlinetracker
 ```
 
@@ -230,7 +223,9 @@ Both checks must pass for an agent to register. This prevents:
 ```bash
 cd backend
 pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+# Requires PostgreSQL running locally or via Docker
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/onlinetracker \
+  python -m uvicorn app.main:app --reload
 ```
 
 ### Frontend only
@@ -241,47 +236,22 @@ npm install
 npm run dev
 ```
 
-## Database Options
-
-### SQLite (Default)
-
-SQLite is used by default with no additional configuration. It's optimized with:
-- WAL mode for better concurrency
-- Parallel monitoring checks (up to 5 concurrent)
-- Retry logic for lock contention
-
-Suitable for: Up to ~50-100 monitors with moderate agent count.
-
-### PostgreSQL (High-Scale)
-
-For larger deployments, PostgreSQL provides true concurrent writes:
-
-```bash
-# Option 1: Use the PostgreSQL compose file
-docker compose -f docker-compose.postgres.yml up -d
-
-# Option 2: Set DATABASE_URL environment variable
-DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/dbname docker compose up -d
-```
-
-Suitable for: 100+ monitors, 10+ agents, high-frequency checks.
-
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  OnlineTracker Server               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │
-│  │  FastAPI    │  │  Scheduler  │  │   React     │ │
-│  │  Backend    │  │  Service    │  │   Frontend  │ │
-│  └──────┬──────┘  └──────┬──────┘  └─────────────┘ │
-│         │                │                          │
-│         └────────┬───────┘                          │
-│                  ▼                                  │
-│           ┌──────────────┐                          │
-│           │   SQLite DB  │                          │
-│           └──────────────┘                          │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  OnlineTracker Server                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  FastAPI    │  │  Scheduler  │  │   React     │         │
+│  │  Backend    │  │  (Parallel) │  │   Frontend  │         │
+│  └──────┬──────┘  └──────┬──────┘  └─────────────┘         │
+│         │                │                                  │
+│         └────────┬───────┘                                  │
+│                  ▼                                          │
+│         ┌────────────────┐                                  │
+│         │   PostgreSQL   │                                  │
+│         └────────────────┘                                  │
+└─────────────────────────────────────────────────────────────┘
            ▲                    ▲
            │ Port 19443         │
     ┌──────┴──────┐      ┌──────┴──────┐

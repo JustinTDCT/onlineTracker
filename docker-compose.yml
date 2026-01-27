@@ -1,5 +1,5 @@
 # OnlineTracker Docker Compose
-# Server and agent deployment
+# Server with PostgreSQL database and optional agent
 #
 # The server runs TWO ports:
 #   - WEB_PORT (8000): Web UI + full admin API - keep internal/protected
@@ -11,15 +11,25 @@
 #
 # Example: HOST_WEB_PORT=9000 docker compose up -d
 # Or create a .env file with: HOST_WEB_PORT=9000
-#
-# DATABASE OPTIONS:
-#   Default: SQLite (embedded, no setup needed)
-#   Optional: PostgreSQL (for high-scale deployments)
-#     - Uncomment the postgres service below
-#     - Set DATABASE_URL in onlinetracker-server environment
-#     - See docker-compose.postgres.yml for a ready-to-use PostgreSQL setup
 
 services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: onlinetracker-postgres
+    environment:
+      - POSTGRES_USER=onlinetracker
+      - POSTGRES_PASSWORD=onlinetracker
+      - POSTGRES_DB=onlinetracker
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onlinetracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # Main server instance
   onlinetracker-server:
     build: .
@@ -28,18 +38,14 @@ services:
       - MODE=server
       - WEB_PORT=8000
       - COMS_PORT=19443
-      # Uncomment for PostgreSQL (requires postgres service below):
-      # - DATABASE_URL=postgresql+asyncpg://onlinetracker:onlinetracker@postgres:5432/onlinetracker
+      - DATABASE_URL=postgresql+asyncpg://onlinetracker:onlinetracker@postgres:5432/onlinetracker
     ports:
       - "${HOST_WEB_PORT:-8000}:8000"      # Web UI + Admin API (keep internal)
       - "${HOST_COMS_PORT:-19443}:19443"   # Agent API only (safe to expose)
-    volumes:
-      - onlinetracker-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
-    # Uncomment if using PostgreSQL:
-    # depends_on:
-    #   postgres:
-    #     condition: service_healthy
 
   # Test agent instance
   # To use: set shared secret and allowed UUIDs in Settings first
@@ -49,7 +55,7 @@ services:
     container_name: onlinetracker-agent
     environment:
       - MODE=agent
-      - AGENT_NAME=TAB2
+      - AGENT_NAME=TestAgent
       - SERVER_HOST=onlinetracker-server
       - COMS_PORT=19443
       - SHARED_SECRET=test-secret-change-me
@@ -59,24 +65,6 @@ services:
       - onlinetracker-server
     restart: unless-stopped
 
-  # PostgreSQL database (optional - uncomment for high-scale deployments)
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: onlinetracker-postgres
-  #   environment:
-  #     - POSTGRES_USER=onlinetracker
-  #     - POSTGRES_PASSWORD=onlinetracker
-  #     - POSTGRES_DB=onlinetracker
-  #   volumes:
-  #     - postgres-data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U onlinetracker"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #   restart: unless-stopped
-
 volumes:
-  onlinetracker-data:
+  postgres-data:
   onlinetracker-agent-data:
-  # postgres-data:  # Uncomment if using PostgreSQL
