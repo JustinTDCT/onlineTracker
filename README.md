@@ -1,18 +1,19 @@
 # OnlineTracker
 
-**Version 2.0.0**
+**Version 2.1.1**
 
 A Docker-based service monitoring system with support for distributed agents.
 
 ## Features
 
 - **Multiple check types**: Ping, HTTP/HTTPS, SSL certificate monitoring
+- **Configurable thresholds**: Per-monitor OK/Degraded/Down thresholds with system defaults
 - **72-hour status history** with visual graphs (like status.cursor.com)
 - **Monitor detail page**: Click any monitor to view detailed status, uptime histograms (24h/week/month/year), and paginated check results
 - **Webhook and email alerts** for status changes and SSL expiry warnings
 - **Agent mode** for distributed monitoring from multiple locations
 - **PostgreSQL database**: Scalable, concurrent writes, production-ready
-- **Parallel monitoring**: Up to 5 concurrent checks for better performance
+- **Scalable scheduling**: Distributed check timing with up to 10 concurrent checks, supports 100+ monitors
 
 ## Quick Start
 
@@ -90,7 +91,26 @@ In server mode, OnlineTracker:
 2. Click "Add Monitor"
 3. Select type (Ping, HTTP, HTTPS, SSL)
 4. Enter target and configuration
-5. Click "Test" to verify, then "Save"
+5. Optionally expand "Threshold Settings" to customize OK/Degraded/Down thresholds
+6. Click "Test" to verify, then "Save"
+
+### Threshold Configuration
+
+Each monitor type has configurable thresholds that determine status:
+
+| Type | OK | Degraded | Down |
+|------|-----|----------|------|
+| **Ping** | Latency ≤ OK threshold | Latency ≤ Degraded threshold | Latency > Degraded threshold or <50% success |
+| **HTTP/HTTPS** | Latency ≤ OK threshold | Latency ≤ Degraded threshold | Latency > Degraded threshold or HTTP error |
+| **SSL** | Days ≥ OK threshold | Days ≥ Warning threshold | Days < Warning threshold or expired |
+
+**Default thresholds** (configurable in Settings > Monitoring):
+- Ping/HTTP: OK ≤ 80ms, Degraded ≤ 200ms
+- SSL: OK ≥ 30 days, Warning ≥ 14 days
+
+**Ping count**: Number of pings per check (1-10, default 5). More pings = more accurate average but longer check time.
+
+Individual monitors can override these defaults in the "Threshold Settings" section of the monitor form.
 
 ### Alert Configuration
 
@@ -193,6 +213,7 @@ Both checks must pass for an agent to register. This prevents:
 
 ### Monitors
 - `GET /api/monitors` - List all monitors
+- `GET /api/monitors/defaults` - Get default threshold values for new monitors
 - `POST /api/monitors` - Create monitor
 - `GET /api/monitors/{id}` - Get monitor details
 - `PUT /api/monitors/{id}` - Update monitor
@@ -243,7 +264,8 @@ npm run dev
 │                  OnlineTracker Server                       │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
 │  │  FastAPI    │  │  Scheduler  │  │   React     │         │
-│  │  Backend    │  │  (Parallel) │  │   Frontend  │         │
+│  │  Backend    │  │ (Distributed│  │   Frontend  │         │
+│  │             │  │  Parallel)  │  │             │         │
 │  └──────┬──────┘  └──────┬──────┘  └─────────────┘         │
 │         │                │                                  │
 │         └────────┬───────┘                                  │
@@ -259,6 +281,19 @@ npm run dev
     │  (Remote)   │      │  (Remote)   │
     └─────────────┘      └─────────────┘
 ```
+
+### Scalability
+
+The scheduler uses **distributed check timing** to handle 100+ monitors efficiently:
+
+- **Per-monitor offsets**: Each monitor gets a unique time slot based on its ID
+- **No burst traffic**: Checks are spread evenly across their interval window
+- **Concurrent execution**: Up to 10 simultaneous checks (configurable)
+- **5-second tick**: Fine-grained scheduling for precise timing
+
+**Capacity formula**: `(interval_seconds × max_concurrent) ÷ avg_check_duration`
+
+Example: `(60s × 10) ÷ 5s = ~120 monitors` on 60-second intervals
 
 ## License
 
