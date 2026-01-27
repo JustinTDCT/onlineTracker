@@ -10,6 +10,9 @@ import type {
   PollPageResult,
   ResultsPage,
   MonitorDefaults,
+  ExportData,
+  ImportData,
+  ImportResult,
 } from '../types';
 
 const API_BASE = '/api';
@@ -156,6 +159,20 @@ export async function updateSettings(data: Partial<Settings>): Promise<Settings>
 export async function testEmail(): Promise<{ success: boolean; message: string }> {
   return fetchJson(`${API_BASE}/settings/test-email`, {
     method: 'POST',
+  });
+}
+
+export async function exportData(): Promise<ExportData> {
+  return fetchJson(`${API_BASE}/settings/export`);
+}
+
+export async function importData(
+  data: ImportData,
+  replaceExisting: boolean = false
+): Promise<ImportResult> {
+  return fetchJson(`${API_BASE}/settings/import?replace_existing=${replaceExisting}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 

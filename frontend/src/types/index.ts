@@ -168,6 +168,46 @@ export interface MonitorDefaults {
   ssl_warning_threshold_days: number;
 }
 
+// Export/Import types
+export interface ExportMonitor {
+  type: string;
+  name: string;
+  description?: string;
+  target: string;
+  config?: MonitorConfig;
+  check_interval: number;
+  enabled: boolean;
+}
+
+export interface ExportAgent {
+  id: string;
+  name?: string;
+  status: string;
+}
+
+export interface ExportData {
+  version: string;
+  exported_at: string;
+  settings: Record<string, string>;
+  monitors: ExportMonitor[];
+  agents: ExportAgent[];
+}
+
+export interface ImportData {
+  version?: string;
+  settings?: Record<string, string>;
+  monitors?: ExportMonitor[];
+  agents?: ExportAgent[];
+}
+
+export interface ImportResult {
+  success: boolean;
+  message: string;
+  settings_imported: number;
+  monitors_imported: number;
+  agents_imported: number;
+}
+
 // Status overview
 export interface MonitorSummary {
   id: number;

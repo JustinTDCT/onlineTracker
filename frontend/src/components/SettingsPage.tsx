@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Save, X, Eye, EyeOff, UserPlus, UserX, Clock, RefreshCw, Activity, Users, Bell, Mail } from 'lucide-react';
-import { getSettings, updateSettings, getPendingAgents, approvePendingAgent, dismissPendingAgent, testEmail } from '../api/client';
-import type { PendingAgent, Settings } from '../types';
+import { useEffect, useState, useRef } from 'react';
+import { Save, X, Eye, EyeOff, UserPlus, UserX, Clock, RefreshCw, Activity, Users, Bell, Mail, Download, Upload, FileJson } from 'lucide-react';
+import { getSettings, updateSettings, getPendingAgents, approvePendingAgent, dismissPendingAgent, testEmail, exportData, importData } from '../api/client';
+import type { PendingAgent, Settings, ExportData, ImportResult } from '../types';
 
-type SettingsTab = 'monitoring' | 'agents' | 'alerts';
+type SettingsTab = 'monitoring' | 'agents' | 'alerts' | 'backup';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -59,6 +59,14 @@ export default function SettingsPage() {
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
   const [emailTestResult, setEmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Export/Import state
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [replaceOnImport, setReplaceOnImport] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [lastExport, setLastExport] = useState<ExportData | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSettings();
@@ -218,6 +226,77 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    setError(null);
+    
+    try {
+      const data = await exportData();
+      setLastExport(data);
+      
+      // Create and download file
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `onlinetracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export data');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const data = JSON.parse(content);
+        await handleImport(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to parse import file');
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleImport(data: ExportData) {
+    setImporting(true);
+    setError(null);
+    setImportResult(null);
+    
+    try {
+      const result = await importData(data, replaceOnImport);
+      setImportResult(result);
+      
+      // Reload settings to reflect changes
+      await loadSettings();
+      
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import data');
+    } finally {
+      setImporting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -230,6 +309,7 @@ export default function SettingsPage() {
     { id: 'monitoring', label: 'Monitoring', icon: <Activity className="h-4 w-4" /> },
     { id: 'agents', label: 'Agents', icon: <Users className="h-4 w-4" /> },
     { id: 'alerts', label: 'Alerts', icon: <Bell className="h-4 w-4" /> },
+    { id: 'backup', label: 'Export/Import', icon: <FileJson className="h-4 w-4" /> },
   ];
 
   return (
@@ -813,16 +893,127 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? 'Saving...' : 'Save Settings'}
-          </button>
-        </div>
+        {/* Backup Tab */}
+        {activeTab === 'backup' && (
+          <div className="space-y-6">
+            {/* Export Section */}
+            <div className="settings-card">
+              <h2 className="settings-card-title">Export Data</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Export your settings, monitors, and agents to a JSON file for backup or migration.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                {exporting ? 'Exporting...' : 'Export to JSON'}
+              </button>
+
+              {lastExport && (
+                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Last Export Summary</h3>
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                    <li>Settings: {Object.keys(lastExport.settings).length} items</li>
+                    <li>Monitors: {lastExport.monitors.length}</li>
+                    <li>Agents: {lastExport.agents.length}</li>
+                    <li>Exported: {new Date(lastExport.exported_at).toLocaleString()}</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Import Section */}
+            <div className="settings-card">
+              <h2 className="settings-card-title">Import Data</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Import settings, monitors, and agents from a previously exported JSON file.
+              </p>
+
+              <div className="space-y-4">
+                <div className="settings-checkbox-wrapper">
+                  <input
+                    type="checkbox"
+                    id="replaceOnImport"
+                    checked={replaceOnImport}
+                    onChange={(e) => setReplaceOnImport(e.target.checked)}
+                    className="settings-checkbox"
+                  />
+                  <label htmlFor="replaceOnImport" className="settings-checkbox-label">
+                    Replace existing monitors (delete all before import)
+                  </label>
+                </div>
+
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="importFile"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={importing}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {importing ? 'Importing...' : 'Select File to Import'}
+                  </button>
+                </div>
+
+                {importResult && (
+                  <div className={`p-4 rounded-lg ${
+                    importResult.success 
+                      ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                      : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                  }`}>
+                    <h3 className={`text-sm font-medium mb-2 ${
+                      importResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+                    }`}>
+                      {importResult.message}
+                    </h3>
+                    {importResult.success && (
+                      <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                        <li>Settings imported: {importResult.settings_imported}</li>
+                        <li>Monitors imported: {importResult.monitors_imported}</li>
+                        <li>Agents imported: {importResult.agents_imported}</li>
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">Import Notes</h3>
+                <ul className="text-sm text-amber-700 dark:text-amber-400 list-disc list-inside space-y-1">
+                  <li>Settings will be merged with existing settings</li>
+                  <li>Monitors with the same name will be updated</li>
+                  <li>Agents will only be added if they don't already exist</li>
+                  <li>Sensitive data (passwords, secrets) may need to be re-entered</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab !== 'backup' && (
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

@@ -1,6 +1,6 @@
 # OnlineTracker
 
-**Version 2.1.1**
+**Version 2.2.0**
 
 A Docker-based service monitoring system with support for distributed agents.
 
@@ -233,6 +233,8 @@ Both checks must pass for an agent to register. This prevents:
 ### Settings
 - `GET /api/settings` - Get settings
 - `PUT /api/settings` - Update settings
+- `GET /api/settings/export` - Export all data (settings, monitors, agents)
+- `POST /api/settings/import` - Import data from export file
 
 ### Status
 - `GET /api/status/overview` - Dashboard summary
