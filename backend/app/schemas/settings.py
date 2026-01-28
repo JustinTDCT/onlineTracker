@@ -8,6 +8,7 @@ class SettingsResponse(BaseModel):
     # Monitoring settings
     check_interval_seconds: int = 60
     ssl_warn_days: str = "30,14,7"  # Comma-separated warning thresholds
+    alert_failure_threshold: int = 2  # Number of consecutive failures before alerting (1-10)
     
     # Default thresholds for PING monitors
     default_ping_count: int = 5  # Number of pings to send (1-10)
@@ -59,6 +60,7 @@ class SettingsUpdate(BaseModel):
     # Monitoring settings
     check_interval_seconds: Optional[int] = Field(None, ge=10, le=3600)
     ssl_warn_days: Optional[str] = None
+    alert_failure_threshold: Optional[int] = Field(None, ge=1, le=10)
     
     # Default thresholds for PING monitors
     default_ping_count: Optional[int] = Field(None, ge=1, le=10)

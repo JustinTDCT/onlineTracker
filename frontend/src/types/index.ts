@@ -117,6 +117,7 @@ export interface Settings {
   // Monitoring
   check_interval_seconds: number;
   ssl_warn_days: string;
+  alert_failure_threshold: number;  // Number of consecutive failures before alerting (1-10)
   
   // Default thresholds for PING monitors
   default_ping_count: number;

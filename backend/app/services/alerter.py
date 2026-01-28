@@ -29,6 +29,7 @@ class AlerterService:
             "alert_repeat_frequency_minutes": "15",
             "alert_on_restored": "1",
             "alert_include_history": "event_only",
+            "alert_failure_threshold": "2",  # Number of consecutive failures before alerting
             "webhook_url": "",
             "email_alerts_enabled": "0",
             "smtp_host": "",
@@ -91,6 +92,39 @@ class AlerterService:
             .limit(100)  # Limit to avoid huge emails
         )
         return list(result.scalars().all())
+    
+    async def _count_consecutive_failures(
+        self,
+        session: AsyncSession,
+        monitor_id: int,
+        current_status: str,
+    ) -> int:
+        """Count consecutive failures (down/degraded) for a monitor, including current status.
+        
+        Returns the count of consecutive down/degraded statuses from most recent.
+        """
+        if current_status not in ("down", "degraded"):
+            return 0
+        
+        # Get recent statuses ordered by time (most recent first)
+        result = await session.execute(
+            select(MonitorStatus)
+            .where(MonitorStatus.monitor_id == monitor_id)
+            .order_by(MonitorStatus.checked_at.desc())
+            .limit(20)  # Look at last 20 checks max
+        )
+        statuses = list(result.scalars().all())
+        
+        # Count consecutive failures from the start
+        count = 0
+        for status in statuses:
+            if status.status in ("down", "degraded"):
+                count += 1
+            else:
+                break  # Stop at first non-failure
+        
+        # Add 1 for the current status (not yet recorded in DB)
+        return count + 1
     
     def _format_history_for_email(
         self,
@@ -167,6 +201,7 @@ class AlerterService:
         """Determine if an alert should be sent based on settings."""
         alert_type = settings.get("alert_type", "once")
         alert_on_restored = settings.get("alert_on_restored", "1") == "1"
+        failure_threshold = int(settings.get("alert_failure_threshold", 2))
         
         # Never alert if alert_type is "none"
         if alert_type == "none":
@@ -183,10 +218,23 @@ class AlerterService:
         
         # Going down or degraded
         if new_status in ("down", "degraded"):
-            if is_state_change:
-                # Always alert on first occurrence
-                return True
+            # Count consecutive failures (including this one)
+            consecutive_failures = await self._count_consecutive_failures(
+                session, monitor.id, new_status
+            )
             
+            # Check if this is the exact threshold crossing (first alert for this outage)
+            if consecutive_failures == failure_threshold:
+                # This is the first time we've hit the threshold - send alert
+                return True
+            elif consecutive_failures < failure_threshold:
+                # Haven't hit threshold yet - no alert
+                logger.debug(
+                    f"Alert suppressed for {monitor.name}: {consecutive_failures}/{failure_threshold} failures"
+                )
+                return False
+            
+            # Already past threshold - check for repeated alerts
             if alert_type == "repeated":
                 # Check if enough time has passed since last alert
                 repeat_minutes = int(settings.get("alert_repeat_frequency_minutes", 15))
@@ -199,7 +247,7 @@ class AlerterService:
                 
                 return False
             
-            # "once" mode - only on state change, which we already handled above
+            # "once" mode - already alerted when threshold was hit
             return False
         
         return False

@@ -15,6 +15,7 @@ export default function SettingsPage() {
   // Form state - Monitoring
   const [checkInterval, setCheckInterval] = useState(60);
   const [sslWarnDays, setSslWarnDays] = useState('30,14,7');
+  const [alertFailureThreshold, setAlertFailureThreshold] = useState(2);
   
   // Default thresholds for PING monitors
   const [defaultPingCount, setDefaultPingCount] = useState(5);
@@ -79,6 +80,7 @@ export default function SettingsPage() {
       // Monitoring
       setCheckInterval(data.check_interval_seconds);
       setSslWarnDays(data.ssl_warn_days);
+      setAlertFailureThreshold(data.alert_failure_threshold);
       // Default thresholds
       setDefaultPingCount(data.default_ping_count);
       setDefaultPingOkThreshold(data.default_ping_ok_threshold_ms);
@@ -171,6 +173,7 @@ export default function SettingsPage() {
         // Monitoring
         check_interval_seconds: checkInterval,
         ssl_warn_days: sslWarnDays,
+        alert_failure_threshold: alertFailureThreshold,
         // Default thresholds
         default_ping_count: defaultPingCount,
         default_ping_ok_threshold_ms: defaultPingOkThreshold,
@@ -376,6 +379,29 @@ export default function SettingsPage() {
                   placeholder="30,14,7"
                 />
                 <p className="settings-help">Comma-separated days before expiry to trigger warnings</p>
+              </div>
+
+              <div>
+                <label className="settings-label">Number of Failures Before Alert</label>
+                <input
+                  type="number"
+                  value={alertFailureThreshold}
+                  onChange={(e) => {
+                    let val = parseInt(e.target.value, 10);
+                    if (val > 10) {
+                      val = 10;
+                      alert('Maximum is 10. Setting to 10.');
+                    } else if (val < 1) {
+                      val = 1;
+                      alert('Minimum is 1. Setting to 1.');
+                    }
+                    setAlertFailureThreshold(val);
+                  }}
+                  className="settings-input"
+                  min={1}
+                  max={10}
+                />
+                <p className="settings-help">How many consecutive failures before triggering an alert (1-10)</p>
               </div>
             </div>
 

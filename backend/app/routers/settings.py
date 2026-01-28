@@ -89,6 +89,7 @@ def _build_settings_response(settings_dict: dict) -> SettingsResponse:
         # Monitoring
         check_interval_seconds=int(settings_dict.get("check_interval_seconds", 60)),
         ssl_warn_days=settings_dict.get("ssl_warn_days", "30,14,7"),
+        alert_failure_threshold=int(settings_dict.get("alert_failure_threshold", 2)),
         
         # Default thresholds for PING monitors
         default_ping_count=int(settings_dict.get("default_ping_count", 5)),

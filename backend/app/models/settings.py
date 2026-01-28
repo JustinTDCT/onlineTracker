@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     # Monitoring settings
     "check_interval_seconds": "60",
     "ssl_warn_days": "30,14,7",
+    "alert_failure_threshold": "2",  # Number of consecutive failures before alerting (1-10)
     
     # Default thresholds for PING monitors (latency in ms)
     "default_ping_count": "5",  # Number of pings to send (1-10)
