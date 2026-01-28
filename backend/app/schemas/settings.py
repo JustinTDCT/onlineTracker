@@ -16,6 +16,7 @@ class SettingsResponse(BaseModel):
     default_ping_degraded_threshold_ms: int = 200  # Latency <= this = Degraded, > = Down
     
     # Default thresholds for HTTP/HTTPS monitors
+    default_http_request_count: int = 3  # Number of requests to send (1-10)
     default_http_ok_threshold_ms: int = 80  # Latency <= this = OK
     default_http_degraded_threshold_ms: int = 200  # Latency <= this = Degraded, > = Down
     
@@ -68,6 +69,7 @@ class SettingsUpdate(BaseModel):
     default_ping_degraded_threshold_ms: Optional[int] = Field(None, ge=1, le=10000)
     
     # Default thresholds for HTTP/HTTPS monitors
+    default_http_request_count: Optional[int] = Field(None, ge=1, le=10)
     default_http_ok_threshold_ms: Optional[int] = Field(None, ge=1, le=30000)
     default_http_degraded_threshold_ms: Optional[int] = Field(None, ge=1, le=30000)
     

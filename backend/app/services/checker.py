@@ -36,6 +36,7 @@ class CheckerService:
     
     # Default thresholds (can be overridden by config)
     DEFAULT_PING_COUNT = 5
+    DEFAULT_HTTP_REQUEST_COUNT = 3
     DEFAULT_OK_THRESHOLD_MS = 80
     DEFAULT_DEGRADED_THRESHOLD_MS = 200
     DEFAULT_SSL_OK_DAYS = 30
@@ -212,14 +213,17 @@ class CheckerService:
         timeout: int, 
         secure: bool = False
     ) -> CheckResult:
-        """Perform HTTP/HTTPS check.
+        """Perform HTTP/HTTPS check with configurable request count.
+        
+        Performs multiple requests (like ping) and averages response times.
         
         Checks in order:
         1. Expected content (if configured) - down if not found
         2. Expected status code (if configured) - down if mismatch
         3. Expected body hash (if configured) - degraded if changed
         4. HTTP status code - down if not 2xx/3xx
-        5. Latency thresholds: uses configurable thresholds
+        5. Success rate: 76-100% = up, 51-75% = degraded, 50% or lower = down
+        6. Latency thresholds (if success rate is OK): uses configurable thresholds
         """
         # Ensure URL has protocol
         if not target.startswith("http"):
@@ -229,83 +233,131 @@ class CheckerService:
         expected_hash = config.get("expected_body_hash")
         expected_content = config.get("expected_content")
         
+        # Get request count from config (default 3, max 10, min 1)
+        request_count = config.get("http_request_count", self.DEFAULT_HTTP_REQUEST_COUNT)
+        if request_count > 10:
+            request_count = 10
+        elif request_count < 1:
+            request_count = 1
+        
         # Get latency thresholds from config
         ok_threshold_ms = config.get("http_ok_threshold_ms", self.DEFAULT_OK_THRESHOLD_MS)
         degraded_threshold_ms = config.get("http_degraded_threshold_ms", self.DEFAULT_DEGRADED_THRESHOLD_MS)
         
+        successful_times: List[int] = []
+        failed_count = 0
+        last_error = None
+        body_hash = None
+        
         try:
-            start = datetime.now()
-            
-            # Disable SSL verification to handle self-signed certificates
             async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, verify=False) as client:
-                response = await client.get(target)
+                for i in range(request_count):
+                    try:
+                        start = datetime.now()
+                        response = await client.get(target)
+                        response_time = int((datetime.now() - start).total_seconds() * 1000)
+                        
+                        # Calculate body hash (use from last successful request)
+                        body_hash = hashlib.md5(response.content).hexdigest()
+                        
+                        # Check expected content in response body
+                        if expected_content:
+                            response_text = response.text
+                            if expected_content not in response_text:
+                                failed_count += 1
+                                last_error = f"Expected content not found: '{expected_content[:50]}{'...' if len(expected_content) > 50 else ''}'"
+                                continue
+                        
+                        # Check expected status
+                        if expected_status and response.status_code != expected_status:
+                            failed_count += 1
+                            last_error = f"Expected status {expected_status}, got {response.status_code}"
+                            continue
+                        
+                        # Check expected body hash
+                        if expected_hash and body_hash != expected_hash:
+                            # Body hash mismatch is degraded, but still counts as "successful" for timing
+                            successful_times.append(response_time)
+                            last_error = "Response body changed"
+                            continue
+                        
+                        # Check HTTP status code: must be 2xx or 3xx
+                        if not (200 <= response.status_code < 400):
+                            failed_count += 1
+                            last_error = f"HTTP {response.status_code}"
+                            continue
+                        
+                        # Request succeeded
+                        successful_times.append(response_time)
+                        
+                    except httpx.TimeoutException:
+                        failed_count += 1
+                        last_error = "Request timeout"
+                    except httpx.ConnectError as e:
+                        failed_count += 1
+                        last_error = f"Connection error: {e}"
+                    except Exception as e:
+                        failed_count += 1
+                        last_error = str(e)
+                    
+                    # Small delay between requests to avoid overwhelming the server
+                    if i < request_count - 1:
+                        await asyncio.sleep(0.1)
             
-            response_time = int((datetime.now() - start).total_seconds() * 1000)
+            # Calculate statistics
+            success_count = len(successful_times)
+            total_attempts = success_count + failed_count
+            success_rate = (success_count / total_attempts) * 100 if total_attempts > 0 else 0
             
-            # Calculate body hash
-            body_hash = hashlib.md5(response.content).hexdigest()
+            # Calculate average response time from successful requests
+            avg_response_time = None
+            if successful_times:
+                avg_response_time = int(sum(successful_times) / len(successful_times))
             
-            # Check expected content in response body FIRST
-            if expected_content:
-                response_text = response.text
-                if expected_content not in response_text:
-                    return CheckResult(
-                        status="down",
-                        response_time_ms=response_time,
-                        details=f"Expected content not found: '{expected_content[:50]}{'...' if len(expected_content) > 50 else ''}'",
-                        body_hash=body_hash,
-                    )
-            
-            # Check expected status
-            if expected_status and response.status_code != expected_status:
+            # All requests failed
+            if success_count == 0:
                 return CheckResult(
                     status="down",
-                    response_time_ms=response_time,
-                    details=f"Expected status {expected_status}, got {response.status_code}",
+                    details=last_error or f"All {request_count} requests failed",
                     body_hash=body_hash,
                 )
             
-            # Check expected body hash
-            if expected_hash and body_hash != expected_hash:
+            # Determine status based on success rate thresholds (same as ping)
+            # 76-100% = up, 51-75% = degraded, 50% or lower = down
+            if success_rate <= 50:
+                return CheckResult(
+                    status="down",
+                    response_time_ms=avg_response_time,
+                    details=f"{success_count}/{total_attempts} requests succeeded ({success_rate:.0f}%)",
+                    body_hash=body_hash,
+                )
+            elif success_rate <= 75:
                 return CheckResult(
                     status="degraded",
-                    response_time_ms=response_time,
-                    details="Response body changed",
-                    body_hash=body_hash,
-                )
-            
-            # Check HTTP status code: must be 2xx or 3xx
-            if not (200 <= response.status_code < 400):
-                return CheckResult(
-                    status="down",
-                    response_time_ms=response_time,
-                    details=f"HTTP {response.status_code}",
-                    body_hash=body_hash,
-                )
-            
-            # All content checks passed, now check latency with configurable thresholds
-            latency_status, latency_details = self._get_latency_status(
-                response_time, ok_threshold_ms, degraded_threshold_ms
-            )
-            
-            if latency_status == "up":
-                return CheckResult(
-                    status="up",
-                    response_time_ms=response_time,
+                    response_time_ms=avg_response_time,
+                    details=f"{success_count}/{total_attempts} requests succeeded ({success_rate:.0f}%)",
                     body_hash=body_hash,
                 )
             else:
-                return CheckResult(
-                    status=latency_status,
-                    response_time_ms=response_time,
-                    details=latency_details,
-                    body_hash=body_hash,
+                # Success rate is good (76-100%), now check latency with configurable thresholds
+                latency_status, latency_details = self._get_latency_status(
+                    avg_response_time, ok_threshold_ms, degraded_threshold_ms
                 )
                 
-        except httpx.TimeoutException:
-            return CheckResult(status="down", details="Request timeout")
-        except httpx.ConnectError as e:
-            return CheckResult(status="down", details=f"Connection error: {e}")
+                if latency_status == "up":
+                    return CheckResult(
+                        status="up",
+                        response_time_ms=avg_response_time,
+                        body_hash=body_hash,
+                    )
+                else:
+                    return CheckResult(
+                        status=latency_status,
+                        response_time_ms=avg_response_time,
+                        details=latency_details,
+                        body_hash=body_hash,
+                    )
+                
         except Exception as e:
             return CheckResult(status="unknown", details=str(e))
     

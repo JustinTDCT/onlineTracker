@@ -19,6 +19,7 @@ class MonitorConfig(BaseModel):
     ping_degraded_threshold_ms: Optional[int] = None  # Latency <= this = Degraded, > = Down
     
     # HTTP/HTTPS thresholds (latency in ms)
+    http_request_count: Optional[int] = None  # Number of requests to send (1-10)
     http_ok_threshold_ms: Optional[int] = None  # Latency <= this = OK
     http_degraded_threshold_ms: Optional[int] = None  # Latency <= this = Degraded, > = Down
     

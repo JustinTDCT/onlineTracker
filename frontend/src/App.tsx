@@ -7,7 +7,7 @@ import MonitorDetail from './components/MonitorDetail';
 import AgentList from './components/AgentList';
 import SettingsPage from './components/SettingsPage';
 
-export const APP_VERSION = '2.4.0';
+export const APP_VERSION = '2.5.0';
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {

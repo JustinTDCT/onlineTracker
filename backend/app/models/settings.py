@@ -28,6 +28,7 @@ DEFAULT_SETTINGS = {
     "default_ping_degraded_threshold_ms": "200",  # Latency <= this = Degraded, > = Down
     
     # Default thresholds for HTTP/HTTPS monitors (latency in ms)
+    "default_http_request_count": "3",  # Number of requests to send (1-10)
     "default_http_ok_threshold_ms": "80",  # Latency <= this = OK
     "default_http_degraded_threshold_ms": "200",  # Latency <= this = Degraded, > = Down
     

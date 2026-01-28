@@ -13,6 +13,7 @@ export interface MonitorConfig {
   ping_degraded_threshold_ms?: number;
   
   // HTTP/HTTPS thresholds (latency in ms)
+  http_request_count?: number;  // Number of requests to send (1-10)
   http_ok_threshold_ms?: number;
   http_degraded_threshold_ms?: number;
   
@@ -125,6 +126,7 @@ export interface Settings {
   default_ping_degraded_threshold_ms: number;
   
   // Default thresholds for HTTP/HTTPS monitors
+  default_http_request_count: number;
   default_http_ok_threshold_ms: number;
   default_http_degraded_threshold_ms: number;
   
@@ -170,6 +172,7 @@ export interface MonitorDefaults {
   ping_count: number;
   ping_ok_threshold_ms: number;
   ping_degraded_threshold_ms: number;
+  http_request_count: number;
   http_ok_threshold_ms: number;
   http_degraded_threshold_ms: number;
   ssl_ok_threshold_days: number;

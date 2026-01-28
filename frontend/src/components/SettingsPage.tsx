@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [defaultPingDegradedThreshold, setDefaultPingDegradedThreshold] = useState(200);
   
   // Default thresholds for HTTP/HTTPS monitors
+  const [defaultHttpRequestCount, setDefaultHttpRequestCount] = useState(3);
   const [defaultHttpOkThreshold, setDefaultHttpOkThreshold] = useState(80);
   const [defaultHttpDegradedThreshold, setDefaultHttpDegradedThreshold] = useState(200);
   
@@ -85,6 +86,7 @@ export default function SettingsPage() {
       setDefaultPingCount(data.default_ping_count);
       setDefaultPingOkThreshold(data.default_ping_ok_threshold_ms);
       setDefaultPingDegradedThreshold(data.default_ping_degraded_threshold_ms);
+      setDefaultHttpRequestCount(data.default_http_request_count);
       setDefaultHttpOkThreshold(data.default_http_ok_threshold_ms);
       setDefaultHttpDegradedThreshold(data.default_http_degraded_threshold_ms);
       setDefaultSslOkThreshold(data.default_ssl_ok_threshold_days);
@@ -178,6 +180,7 @@ export default function SettingsPage() {
         default_ping_count: defaultPingCount,
         default_ping_ok_threshold_ms: defaultPingOkThreshold,
         default_ping_degraded_threshold_ms: defaultPingDegradedThreshold,
+        default_http_request_count: defaultHttpRequestCount,
         default_http_ok_threshold_ms: defaultHttpOkThreshold,
         default_http_degraded_threshold_ms: defaultHttpDegradedThreshold,
         default_ssl_ok_threshold_days: defaultSslOkThreshold,
@@ -467,6 +470,29 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 These defaults apply to new HTTP/HTTPS monitors. Individual monitors can override these values.
               </p>
+
+              <div>
+                <label className="settings-label">Number of Requests</label>
+                <input
+                  type="number"
+                  value={defaultHttpRequestCount}
+                  onChange={(e) => {
+                    let val = parseInt(e.target.value, 10);
+                    if (val > 10) {
+                      val = 10;
+                      alert('Maximum request count is 10. Setting to 10.');
+                    } else if (val < 1) {
+                      val = 1;
+                      alert('Minimum request count is 1. Setting to 1.');
+                    }
+                    setDefaultHttpRequestCount(val);
+                  }}
+                  className="settings-input"
+                  min={1}
+                  max={10}
+                />
+                <p className="settings-help">Number of HTTP requests to send per check (1-10). Response times are averaged.</p>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
