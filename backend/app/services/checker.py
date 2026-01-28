@@ -300,9 +300,9 @@ class CheckerService:
                         failed_count += 1
                         last_error = str(e)
                     
-                    # Small delay between requests to avoid overwhelming the server
+                    # 1 second delay between requests (same as ping interval)
                     if i < request_count - 1:
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(1)
             
             # Calculate statistics
             success_count = len(successful_times)
