@@ -467,7 +467,7 @@ async def get_monitor_history(
     hours: int = Query(default=72, ge=1, le=8760),  # Max 1 year
     db: AsyncSession = Depends(get_db),
 ):
-    """Get status history for a monitor, grouped into 15-minute intervals."""
+    """Get status history for a monitor, grouped into adaptive intervals."""
     result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
     monitor = result.scalar_one_or_none()
     
@@ -475,6 +475,16 @@ async def get_monitor_history(
         raise HTTPException(status_code=404, detail="Monitor not found")
     
     cutoff = datetime.utcnow() - timedelta(hours=hours)
+    
+    # Use adaptive bucket sizes based on time range to limit output to ~100-200 buckets
+    if hours <= 24:
+        interval_minutes = 15  # 96 buckets for 24h
+    elif hours <= 168:  # 1 week
+        interval_minutes = 60  # 168 buckets
+    elif hours <= 720:  # 30 days
+        interval_minutes = 240  # 180 buckets
+    else:  # Up to 1 year
+        interval_minutes = 1440  # 365 buckets (1 day each)
     
     # Get all status records in the time range
     status_result = await db.execute(
@@ -487,8 +497,6 @@ async def get_monitor_history(
     )
     statuses = status_result.scalars().all()
     
-    # Group into 15-minute intervals
-    interval_minutes = 15
     history = []
     
     if not statuses:
