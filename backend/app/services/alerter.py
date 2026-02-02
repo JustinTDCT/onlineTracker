@@ -26,6 +26,7 @@ class AlerterService:
         # Start with defaults
         settings = {
             "alert_type": "once",
+            "alert_severity_threshold": "all",  # all or down_only
             "alert_repeat_frequency_minutes": "15",
             "alert_on_restored": "1",
             "alert_include_history": "event_only",
@@ -202,6 +203,7 @@ class AlerterService:
         alert_type = settings.get("alert_type", "once")
         alert_on_restored = settings.get("alert_on_restored", "1") == "1"
         failure_threshold = int(settings.get("alert_failure_threshold", 2))
+        severity_threshold = settings.get("alert_severity_threshold", "all")
         
         # Never alert if alert_type is "none"
         if alert_type == "none":
@@ -213,11 +215,29 @@ class AlerterService:
         # Going up (restored)
         if new_status == "up":
             if is_state_change and old_status in ("down", "degraded"):
-                return alert_on_restored
+                if not alert_on_restored:
+                    return False
+                
+                # If severity is "down_only", only send UP alert if previous state was DOWN
+                # (not if it was just DEGRADED, since we wouldn't have alerted for that)
+                if severity_threshold == "down_only" and old_status == "degraded":
+                    logger.debug(
+                        f"UP alert suppressed for {monitor.name}: severity is down_only and previous state was degraded"
+                    )
+                    return False
+                
+                return True
             return False
         
         # Going down or degraded
         if new_status in ("down", "degraded"):
+            # Check severity threshold - if "down_only", skip alerts for degraded
+            if severity_threshold == "down_only" and new_status == "degraded":
+                logger.debug(
+                    f"Alert suppressed for {monitor.name}: severity is down_only and status is degraded"
+                )
+                return False
+            
             # Count consecutive failures (including this one)
             consecutive_failures = await self._count_consecutive_failures(
                 session, monitor.id, new_status

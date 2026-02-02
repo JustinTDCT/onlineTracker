@@ -141,6 +141,7 @@ export interface Settings {
   
   // Alerts
   alert_type: 'once' | 'repeated' | 'none';
+  alert_severity_threshold: 'all' | 'down_only';
   alert_repeat_frequency_minutes: number;
   alert_on_restored: boolean;
   alert_include_history: 'event_only' | 'last_24h';

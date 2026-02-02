@@ -43,6 +43,7 @@ DEFAULT_SETTINGS = {
     
     # Alert settings
     "alert_type": "once",  # once, repeated, none
+    "alert_severity_threshold": "all",  # all (down+degraded) or down_only
     "alert_repeat_frequency_minutes": "15",
     "alert_on_restored": "1",  # 0 or 1
     "alert_include_history": "event_only",  # event_only, last_24h

@@ -31,6 +31,7 @@ class SettingsResponse(BaseModel):
     
     # Alert settings
     alert_type: str = "once"  # once, repeated, none
+    alert_severity_threshold: str = "all"  # all (down+degraded) or down_only
     alert_repeat_frequency_minutes: int = 15
     alert_on_restored: bool = True
     alert_include_history: str = "event_only"  # event_only, last_24h
@@ -84,6 +85,7 @@ class SettingsUpdate(BaseModel):
     
     # Alert settings
     alert_type: Optional[Literal["once", "repeated", "none"]] = None
+    alert_severity_threshold: Optional[Literal["all", "down_only"]] = None
     alert_repeat_frequency_minutes: Optional[int] = Field(None, ge=1, le=1440)
     alert_on_restored: Optional[bool] = None
     alert_include_history: Optional[Literal["event_only", "last_24h"]] = None

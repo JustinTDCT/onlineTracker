@@ -44,6 +44,7 @@ export default function SettingsPage() {
 
   // Form state - Alerts
   const [alertType, setAlertType] = useState<'once' | 'repeated' | 'none'>('once');
+  const [alertSeverityThreshold, setAlertSeverityThreshold] = useState<'all' | 'down_only'>('all');
   const [alertRepeatFrequency, setAlertRepeatFrequency] = useState(15);
   const [alertOnRestored, setAlertOnRestored] = useState(true);
   const [alertIncludeHistory, setAlertIncludeHistory] = useState<'event_only' | 'last_24h'>('event_only');
@@ -97,6 +98,7 @@ export default function SettingsPage() {
       setAllowedAgentUuids(data.allowed_agent_uuids || '');
       // Alerts
       setAlertType(data.alert_type);
+      setAlertSeverityThreshold(data.alert_severity_threshold);
       setAlertRepeatFrequency(data.alert_repeat_frequency_minutes);
       setAlertOnRestored(data.alert_on_restored);
       setAlertIncludeHistory(data.alert_include_history);
@@ -191,6 +193,7 @@ export default function SettingsPage() {
         allowed_agent_uuids: allowedAgentUuids || undefined,
         // Alerts
         alert_type: alertType,
+        alert_severity_threshold: alertSeverityThreshold,
         alert_repeat_frequency_minutes: alertRepeatFrequency,
         alert_on_restored: alertOnRestored,
         alert_include_history: alertIncludeHistory,
@@ -716,6 +719,22 @@ export default function SettingsPage() {
                   <option value="repeated">Repeated - Continue alerting while down</option>
                   <option value="none">None - Disable all alerts</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="settings-label">Alert Severity</label>
+                <select
+                  value={alertSeverityThreshold}
+                  onChange={(e) => setAlertSeverityThreshold(e.target.value as 'all' | 'down_only')}
+                  className="settings-select"
+                >
+                  <option value="all">All - Alert on both Down and Degraded</option>
+                  <option value="down_only">Down Only - Only alert when completely down</option>
+                </select>
+                <p className="settings-help">
+                  When set to "Down Only", degraded statuses won't trigger alerts. 
+                  UP notifications will only be sent when recovering from DOWN (not from DEGRADED).
+                </p>
               </div>
 
               {alertType === 'repeated' && (
