@@ -196,6 +196,11 @@ export interface MonitorDefaults {
 }
 
 // Export/Import types
+export interface ExportTag {
+  name: string;
+  color: string;
+}
+
 export interface ExportMonitor {
   type: string;
   name: string;
@@ -204,6 +209,8 @@ export interface ExportMonitor {
   config?: MonitorConfig;
   check_interval: number;
   enabled: boolean;
+  agent_id?: string;
+  tags?: string[];  // List of tag names
 }
 
 export interface ExportAgent {
@@ -216,6 +223,7 @@ export interface ExportData {
   version: string;
   exported_at: string;
   settings: Record<string, string>;
+  tags: ExportTag[];
   monitors: ExportMonitor[];
   agents: ExportAgent[];
 }
@@ -223,6 +231,7 @@ export interface ExportData {
 export interface ImportData {
   version?: string;
   settings?: Record<string, string>;
+  tags?: ExportTag[];
   monitors?: ExportMonitor[];
   agents?: ExportAgent[];
 }
@@ -231,6 +240,7 @@ export interface ImportResult {
   success: boolean;
   message: string;
   settings_imported: number;
+  tags_imported: number;
   monitors_imported: number;
   agents_imported: number;
 }

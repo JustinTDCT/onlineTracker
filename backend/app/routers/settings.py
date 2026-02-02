@@ -9,8 +9,9 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Setting, Monitor, Agent
+from ..models import Setting, Monitor, Agent, Tag
 from ..models.settings import DEFAULT_SETTINGS
+from sqlalchemy.orm import selectinload
 from ..schemas.settings import SettingsResponse, SettingsUpdate
 from ..services.email_sender import email_sender_service, EmailConfig
 from ..utils.db_utils import retry_on_lock
@@ -19,6 +20,12 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 # Export/Import schemas
+class ExportTag(BaseModel):
+    """Tag data for export."""
+    name: str
+    color: str
+
+
 class ExportMonitor(BaseModel):
     """Monitor data for export."""
     type: str
@@ -28,6 +35,8 @@ class ExportMonitor(BaseModel):
     config: Optional[dict] = None
     check_interval: int
     enabled: bool
+    agent_id: Optional[str] = None
+    tags: Optional[List[str]] = None  # List of tag names
 
 
 class ExportAgent(BaseModel):
@@ -39,9 +48,10 @@ class ExportAgent(BaseModel):
 
 class ExportData(BaseModel):
     """Complete export data structure."""
-    version: str = "2.1"
+    version: str = "2.7"
     exported_at: str
     settings: dict
+    tags: List[ExportTag]
     monitors: List[ExportMonitor]
     agents: List[ExportAgent]
 
@@ -50,6 +60,7 @@ class ImportData(BaseModel):
     """Import data structure."""
     version: Optional[str] = None
     settings: Optional[dict] = None
+    tags: Optional[List[ExportTag]] = None
     monitors: Optional[List[ExportMonitor]] = None
     agents: Optional[List[ExportAgent]] = None
 
@@ -59,6 +70,7 @@ class ImportResult(BaseModel):
     success: bool
     message: str
     settings_imported: int = 0
+    tags_imported: int = 0
     monitors_imported: int = 0
     agents_imported: int = 0
 
@@ -235,12 +247,23 @@ OnlineTracker Monitoring System
 
 @router.get("/export", response_model=ExportData)
 async def export_data(db: AsyncSession = Depends(get_db)):
-    """Export all settings, monitors, and agents as JSON."""
+    """Export all settings, monitors, tags, and agents as JSON."""
     # Get settings
     settings_dict = await get_all_settings(db)
     
-    # Get monitors
-    result = await db.execute(select(Monitor).order_by(Monitor.name))
+    # Get tags
+    result = await db.execute(select(Tag).order_by(Tag.name))
+    tags = result.scalars().all()
+    
+    export_tags = [
+        ExportTag(name=t.name, color=t.color)
+        for t in tags
+    ]
+    
+    # Get monitors with their tags
+    result = await db.execute(
+        select(Monitor).options(selectinload(Monitor.tags)).order_by(Monitor.name)
+    )
     monitors = result.scalars().all()
     
     export_monitors = []
@@ -252,6 +275,9 @@ async def export_data(db: AsyncSession = Depends(get_db)):
             except json.JSONDecodeError:
                 pass
         
+        # Get tag names for this monitor
+        tag_names = [t.name for t in m.tags] if m.tags else None
+        
         export_monitors.append(ExportMonitor(
             type=m.type,
             name=m.name,
@@ -260,6 +286,8 @@ async def export_data(db: AsyncSession = Depends(get_db)):
             config=config,
             check_interval=m.check_interval,
             enabled=bool(m.enabled),
+            agent_id=m.agent_id,
+            tags=tag_names if tag_names else None,
         ))
     
     # Get agents (only approved ones)
@@ -272,9 +300,10 @@ async def export_data(db: AsyncSession = Depends(get_db)):
     ]
     
     return ExportData(
-        version="2.1",
+        version="2.7",
         exported_at=datetime.utcnow().isoformat() + "Z",
         settings=settings_dict,
+        tags=export_tags,
         monitors=export_monitors,
         agents=export_agents,
     )
@@ -286,13 +315,14 @@ async def import_data(
     replace_existing: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """Import settings, monitors, and agents from JSON.
+    """Import settings, monitors, tags, and agents from JSON.
     
     Args:
         data: The export data to import
         replace_existing: If true, delete existing data before import
     """
     settings_count = 0
+    tags_count = 0
     monitors_count = 0
     agents_count = 0
     
@@ -321,6 +351,37 @@ async def import_data(
                     db.add(setting)
                 settings_count += 1
         
+        # Import tags (must be done before monitors to establish tag references)
+        tag_name_to_obj = {}
+        if data.tags:
+            if replace_existing:
+                # Delete existing tags
+                await db.execute(delete(Tag))
+            
+            for t in data.tags:
+                # Check if tag with same name exists
+                result = await db.execute(select(Tag).where(Tag.name == t.name))
+                existing = result.scalar_one_or_none()
+                
+                if existing:
+                    if replace_existing:
+                        existing.color = t.color
+                    tag_name_to_obj[t.name] = existing
+                else:
+                    new_tag = Tag(name=t.name, color=t.color)
+                    db.add(new_tag)
+                    tag_name_to_obj[t.name] = new_tag
+                tags_count += 1
+            
+            # Flush to ensure tags have IDs
+            await db.flush()
+        
+        # Build lookup for existing tags (for monitor-tag associations)
+        result = await db.execute(select(Tag))
+        all_tags = result.scalars().all()
+        for t in all_tags:
+            tag_name_to_obj[t.name] = t
+        
         # Import monitors
         if data.monitors:
             if replace_existing:
@@ -330,7 +391,7 @@ async def import_data(
             for m in data.monitors:
                 # Check if monitor with same name exists
                 result = await db.execute(
-                    select(Monitor).where(Monitor.name == m.name)
+                    select(Monitor).options(selectinload(Monitor.tags)).where(Monitor.name == m.name)
                 )
                 existing = result.scalar_one_or_none()
                 
@@ -342,6 +403,13 @@ async def import_data(
                     existing.config = json.dumps(m.config) if m.config else None
                     existing.check_interval = m.check_interval
                     existing.enabled = 1 if m.enabled else 0
+                    existing.agent_id = m.agent_id
+                    
+                    # Update tags
+                    if m.tags:
+                        existing.tags = [tag_name_to_obj[name] for name in m.tags if name in tag_name_to_obj]
+                    else:
+                        existing.tags = []
                 else:
                     # Create new monitor
                     new_monitor = Monitor(
@@ -352,7 +420,13 @@ async def import_data(
                         config=json.dumps(m.config) if m.config else None,
                         check_interval=m.check_interval,
                         enabled=1 if m.enabled else 0,
+                        agent_id=m.agent_id,
                     )
+                    
+                    # Assign tags
+                    if m.tags:
+                        new_monitor.tags = [tag_name_to_obj[name] for name in m.tags if name in tag_name_to_obj]
+                    
                     db.add(new_monitor)
                 monitors_count += 1
         
@@ -383,6 +457,7 @@ async def import_data(
             success=True,
             message="Import completed successfully",
             settings_imported=settings_count,
+            tags_imported=tags_count,
             monitors_imported=monitors_count,
             agents_imported=agents_count,
         )
