@@ -20,32 +20,47 @@ export default function MonitorDetail() {
   const [history, setHistory] = useState<HistoryData>({ hours24: [], week: [], month: [], year: [] });
   const [responseTimes, setResponseTimes] = useState<ResponseTimePoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    loadMonitor(Number(id));
+    const monitorId = Number(id);
+    loadMonitor(monitorId);
+    loadHistoryData(monitorId);
   }, [id]);
 
+  // Load monitor info first (fast) - shows the header immediately
   async function loadMonitor(monitorId: number) {
     try {
       setLoading(true);
-      const [monitorData, h24, hWeek, hMonth, hYear, rtData] = await Promise.all([
-        getMonitor(monitorId),
-        getMonitorHistory(monitorId, 24),
-        getMonitorHistory(monitorId, 168),
-        getMonitorHistory(monitorId, 720),
-        getMonitorHistory(monitorId, 8760),
-        getResponseTimes(monitorId, 168), // Get 7 days of response time data
-      ]);
+      const monitorData = await getMonitor(monitorId);
       setMonitor(monitorData);
-      setHistory({ hours24: h24, week: hWeek, month: hMonth, year: hYear });
-      setResponseTimes(rtData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load monitor');
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Load history and charts separately (can be slower)
+  async function loadHistoryData(monitorId: number) {
+    try {
+      setHistoryLoading(true);
+      const [h24, hWeek, hMonth, hYear, rtData] = await Promise.all([
+        getMonitorHistory(monitorId, 24),
+        getMonitorHistory(monitorId, 168),
+        getMonitorHistory(monitorId, 720),
+        getMonitorHistory(monitorId, 8760),
+        getResponseTimes(monitorId, 168),
+      ]);
+      setHistory({ hours24: h24, week: hWeek, month: hMonth, year: hYear });
+      setResponseTimes(rtData);
+    } catch (err) {
+      console.error('Failed to load history data:', err);
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -172,33 +187,45 @@ export default function MonitorDetail() {
       </div>
 
       {/* Response Time Chart - only for non-SSL monitors */}
-      {monitor.type !== 'ssl' && responseTimes.length > 0 && (
+      {monitor.type !== 'ssl' && (
         <div className="monitor-detail-section">
-          <ResponseTimeChart
-            data={responseTimes}
-            title="Response Time"
-            okThreshold={
-              monitor.type === 'ping'
-                ? monitor.config?.ping_ok_threshold_ms
-                : monitor.config?.http_ok_threshold_ms
-            }
-            degradedThreshold={
-              monitor.type === 'ping'
-                ? monitor.config?.ping_degraded_threshold_ms
-                : monitor.config?.http_degraded_threshold_ms
-            }
-          />
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : responseTimes.length > 0 ? (
+            <ResponseTimeChart
+              data={responseTimes}
+              title="Response Time"
+              okThreshold={
+                monitor.type === 'ping'
+                  ? monitor.config?.ping_ok_threshold_ms
+                  : monitor.config?.http_ok_threshold_ms
+              }
+              degradedThreshold={
+                monitor.type === 'ping'
+                  ? monitor.config?.ping_degraded_threshold_ms
+                  : monitor.config?.http_degraded_threshold_ms
+              }
+            />
+          ) : null}
         </div>
       )}
 
       <div className="monitor-detail-section">
         <h2 className="monitor-detail-section-title">Uptime History</h2>
-        <div className="histogram-grid">
-          <StatusHistogram history={history.hours24} title="Last 24 Hours" periodLabel="24 hours" />
-          <StatusHistogram history={history.week} title="Last Week" periodLabel="7 days" />
-          <StatusHistogram history={history.month} title="Last Month" periodLabel="30 days" />
-          <StatusHistogram history={history.year} title="Last Year" periodLabel="365 days" />
-        </div>
+        {historyLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : (
+          <div className="histogram-grid">
+            <StatusHistogram history={history.hours24} title="Last 24 Hours" periodLabel="24 hours" />
+            <StatusHistogram history={history.week} title="Last Week" periodLabel="7 days" />
+            <StatusHistogram history={history.month} title="Last Month" periodLabel="30 days" />
+            <StatusHistogram history={history.year} title="Last Year" periodLabel="365 days" />
+          </div>
+        )}
       </div>
 
       <div className="monitor-detail-section">
