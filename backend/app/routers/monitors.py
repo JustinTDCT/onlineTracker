@@ -382,6 +382,85 @@ async def poll_page(request: PollPageRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/batch-history")
+async def get_batch_history(
+    hours: int = Query(default=24, ge=1, le=8760),  # Max 1 year
+    db: AsyncSession = Depends(get_db),
+):
+    """Get simplified status history for ALL monitors in one call (for dashboard mini-graphs)."""
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    
+    # Get all monitors
+    monitors_result = await db.execute(select(Monitor.id))
+    monitor_ids = [m[0] for m in monitors_result.all()]
+    
+    # Get all statuses for all monitors in one query
+    status_result = await db.execute(
+        select(MonitorStatus)
+        .where(MonitorStatus.checked_at >= cutoff)
+        .order_by(MonitorStatus.checked_at)
+    )
+    all_statuses = status_result.scalars().all()
+    
+    # Group statuses by monitor_id
+    statuses_by_monitor = {}
+    for s in all_statuses:
+        if s.monitor_id not in statuses_by_monitor:
+            statuses_by_monitor[s.monitor_id] = []
+        statuses_by_monitor[s.monitor_id].append(s)
+    
+    # Build history for each monitor
+    result = {}
+    interval_minutes = 15
+    end_time = datetime.utcnow()
+    
+    for monitor_id in monitor_ids:
+        statuses = statuses_by_monitor.get(monitor_id, [])
+        history = []
+        current_time = cutoff
+        
+        while current_time < end_time:
+            bucket_end = current_time + timedelta(minutes=interval_minutes)
+            bucket_statuses = [
+                s for s in statuses
+                if current_time <= s.checked_at < bucket_end
+            ]
+            
+            if bucket_statuses:
+                up_count = sum(1 for s in bucket_statuses if s.status == "up")
+                uptime = (up_count / len(bucket_statuses)) * 100
+                
+                if any(s.status == "down" for s in bucket_statuses):
+                    bucket_status = "down"
+                elif any(s.status == "degraded" for s in bucket_statuses):
+                    bucket_status = "degraded"
+                else:
+                    bucket_status = "up"
+                
+                response_times = [s.response_time_ms for s in bucket_statuses if s.response_time_ms]
+                avg_response = int(sum(response_times) / len(response_times)) if response_times else None
+                
+                history.append({
+                    "timestamp": current_time.isoformat(),
+                    "status": bucket_status,
+                    "uptime_percent": round(uptime, 2),
+                    "response_time_avg_ms": avg_response,
+                })
+            else:
+                history.append({
+                    "timestamp": current_time.isoformat(),
+                    "status": "unknown",
+                    "uptime_percent": 0,
+                    "response_time_avg_ms": None,
+                })
+            
+            current_time = bucket_end
+        
+        result[str(monitor_id)] = history
+    
+    return result
+
+
 @router.get("/{monitor_id}/history", response_model=List[StatusHistoryPoint])
 async def get_monitor_history(
     monitor_id: int,

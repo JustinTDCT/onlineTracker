@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, Filter, HelpCircle, Search, Server, Tag as TagIcon, TrendingUp, Wifi, WifiOff } from 'lucide-react';
-import { getMonitors, getMonitorHistory, getAgents, getTags } from '../api/client';
+import { getMonitors, getBatchHistory, getAgents, getTags } from '../api/client';
 import type { Monitor, StatusHistoryPoint, Agent, Tag } from '../types';
 import MiniStatusGraph from './MiniStatusGraph';
 import { useWebSocket, StatusUpdate } from '../hooks/useWebSocket';
@@ -101,19 +101,18 @@ export default function Dashboard() {
   async function loadMonitors() {
     try {
       setLoading(true);
-      const monitorList = await getMonitors();
       
-      // Load history for each monitor
-      const monitorsWithHistory = await Promise.all(
-        monitorList.map(async (monitor) => {
-          try {
-            const history = await getMonitorHistory(monitor.id, selectedRange.hours);
-            return { ...monitor, history };
-          } catch {
-            return { ...monitor, history: [] };
-          }
-        })
-      );
+      // Fetch monitors and batch history in parallel (single API call each)
+      const [monitorList, batchHistory] = await Promise.all([
+        getMonitors(),
+        getBatchHistory(selectedRange.hours),
+      ]);
+      
+      // Merge history into monitors
+      const monitorsWithHistory = monitorList.map((monitor) => ({
+        ...monitor,
+        history: batchHistory[String(monitor.id)] || [],
+      }));
       
       setMonitors(monitorsWithHistory);
       setError(null);

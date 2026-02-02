@@ -96,6 +96,13 @@ export async function getMonitorHistory(
   return fetchJson(`${API_BASE}/monitors/${id}/history?hours=${hours}`);
 }
 
+// Batch history for all monitors (used by Dashboard)
+export async function getBatchHistory(
+  hours = 24
+): Promise<Record<string, StatusHistoryPoint[]>> {
+  return fetchJson(`${API_BASE}/monitors/batch-history?hours=${hours}`);
+}
+
 export async function getMonitorResults(
   id: number,
   hours = 24,
