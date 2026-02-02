@@ -113,6 +113,7 @@ def _build_settings_response(settings_dict: dict) -> SettingsResponse:
         default_ping_degraded_threshold_ms=int(settings_dict.get("default_ping_degraded_threshold_ms", 200)),
         
         # Default thresholds for HTTP/HTTPS monitors
+        default_http_request_count=int(settings_dict.get("default_http_request_count", 3)),
         default_http_ok_threshold_ms=int(settings_dict.get("default_http_ok_threshold_ms", 80)),
         default_http_degraded_threshold_ms=int(settings_dict.get("default_http_degraded_threshold_ms", 200)),
         
@@ -127,6 +128,7 @@ def _build_settings_response(settings_dict: dict) -> SettingsResponse:
         
         # Alerts
         alert_type=settings_dict.get("alert_type", "once"),
+        alert_severity_threshold=settings_dict.get("alert_severity_threshold", "all"),
         alert_repeat_frequency_minutes=int(settings_dict.get("alert_repeat_frequency_minutes", 15)),
         alert_on_restored=_bool_from_str(settings_dict.get("alert_on_restored", "1")),
         alert_include_history=settings_dict.get("alert_include_history", "event_only"),
