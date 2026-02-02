@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, X, Eye, EyeOff, UserPlus, UserX, Clock, RefreshCw, Activity, Users, Bell, Mail, Download, Upload, FileJson } from 'lucide-react';
-import { getSettings, updateSettings, getPendingAgents, approvePendingAgent, dismissPendingAgent, testEmail, exportData, importData } from '../api/client';
-import type { PendingAgent, Settings, ExportData, ImportResult } from '../types';
+import { Save, X, Eye, EyeOff, UserPlus, UserX, Clock, RefreshCw, Activity, Users, Bell, Mail, Download, Upload, FileJson, Tag, Plus, Pencil, Trash2 } from 'lucide-react';
+import { getSettings, updateSettings, getPendingAgents, approvePendingAgent, dismissPendingAgent, testEmail, exportData, importData, getTags, createTag, updateTag, deleteTag } from '../api/client';
+import type { PendingAgent, Settings, ExportData, ImportResult, Tag as TagType } from '../types';
 
-type SettingsTab = 'monitoring' | 'agents' | 'alerts' | 'backup';
+type SettingsTab = 'monitoring' | 'agents' | 'alerts' | 'tags' | 'backup';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -71,9 +71,19 @@ export default function SettingsPage() {
   const [lastExport, setLastExport] = useState<ExportData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Tags state
+  const [tags, setTags] = useState<TagType[]>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+  const [editingTag, setEditingTag] = useState<TagType | null>(null);
+  const [showTagForm, setShowTagForm] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#6366f1');
+  const [savingTag, setSavingTag] = useState(false);
+
   useEffect(() => {
     loadSettings();
     loadPendingAgents();
+    loadTags();
   }, []);
 
   async function loadSettings() {
@@ -130,6 +140,67 @@ export default function SettingsPage() {
     } finally {
       setLoadingPending(false);
     }
+  }
+
+  async function loadTags() {
+    setLoadingTags(true);
+    try {
+      const data = await getTags();
+      setTags(data);
+    } catch (err) {
+      console.error('Failed to load tags:', err);
+    } finally {
+      setLoadingTags(false);
+    }
+  }
+
+  async function handleSaveTag() {
+    if (!newTagName.trim()) return;
+    setSavingTag(true);
+    try {
+      if (editingTag) {
+        await updateTag(editingTag.id, { name: newTagName, color: newTagColor });
+      } else {
+        await createTag({ name: newTagName, color: newTagColor });
+      }
+      await loadTags();
+      setShowTagForm(false);
+      setEditingTag(null);
+      setNewTagName('');
+      setNewTagColor('#6366f1');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save tag');
+    } finally {
+      setSavingTag(false);
+    }
+  }
+
+  async function handleDeleteTag(tagId: number) {
+    if (!confirm('Delete this tag? It will be removed from all monitors.')) return;
+    try {
+      await deleteTag(tagId);
+      await loadTags();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete tag');
+    }
+  }
+
+  function openEditTag(tag: TagType) {
+    setEditingTag(tag);
+    setNewTagName(tag.name);
+    setNewTagColor(tag.color);
+    setShowTagForm(true);
+  }
+
+  function openNewTag() {
+    setEditingTag(null);
+    setNewTagName('');
+    setNewTagColor('#6366f1');
+    setShowTagForm(true);
   }
   
   async function handleApprovePending(uuid: string) {
@@ -318,6 +389,7 @@ export default function SettingsPage() {
     { id: 'monitoring', label: 'Monitoring', icon: <Activity className="h-4 w-4" /> },
     { id: 'agents', label: 'Agents', icon: <Users className="h-4 w-4" /> },
     { id: 'alerts', label: 'Alerts', icon: <Bell className="h-4 w-4" /> },
+    { id: 'tags', label: 'Tags', icon: <Tag className="h-4 w-4" /> },
     { id: 'backup', label: 'Export/Import', icon: <FileJson className="h-4 w-4" /> },
   ];
 
@@ -964,6 +1036,143 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {/* Tags Tab */}
+        {activeTab === 'tags' && (
+          <div className="settings-card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="settings-card-title mb-0">Manage Tags</h2>
+              <button
+                type="button"
+                onClick={openNewTag}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
+              >
+                <Plus className="h-4 w-4" />
+                Add Tag
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Create tags to organize and group your monitors. Tags can be assigned when creating or editing monitors.
+            </p>
+
+            {showTagForm && (
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
+                  {editingTag ? 'Edit Tag' : 'New Tag'}
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="settings-label">Name</label>
+                    <input
+                      type="text"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      className="settings-input"
+                      placeholder="Production"
+                      maxLength={50}
+                    />
+                  </div>
+                  <div>
+                    <label className="settings-label">Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newTagColor}
+                        onChange={(e) => setNewTagColor(e.target.value)}
+                        className="h-10 w-16 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={newTagColor}
+                        onChange={(e) => setNewTagColor(e.target.value)}
+                        className="settings-input flex-1"
+                        placeholder="#6366f1"
+                        pattern="^#[0-9a-fA-F]{6}$"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-4">
+                  <button
+                    type="button"
+                    onClick={handleSaveTag}
+                    disabled={savingTag || !newTagName.trim()}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    {savingTag ? 'Saving...' : 'Save Tag'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTagForm(false);
+                      setEditingTag(null);
+                      setNewTagName('');
+                      setNewTagColor('#6366f1');
+                    }}
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loadingTags ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : tags.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                No tags created yet. Click "Add Tag" to create one.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tags.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="tag-badge text-sm"
+                        style={{
+                          backgroundColor: tag.color + '20',
+                          color: tag.color,
+                          borderColor: tag.color,
+                        }}
+                      >
+                        {tag.name}
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {tag.monitor_count || 0} monitor{(tag.monitor_count || 0) !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditTag(tag)}
+                        className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                        title="Edit"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTag(tag.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Backup Tab */}
         {activeTab === 'backup' && (
           <div className="space-y-6">
@@ -1073,7 +1282,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeTab !== 'backup' && (
+        {activeTab !== 'backup' && activeTab !== 'tags' && (
           <div className="flex justify-end">
             <button
               type="submit"

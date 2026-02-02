@@ -27,6 +27,7 @@ from ..models.settings import DEFAULT_SETTINGS
 from ..utils.db_utils import retry_on_lock
 from .checker import checker_service
 from .alerter import alerter_service
+from .websocket_manager import websocket_manager
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +267,16 @@ class SchedulerService:
                 check_result.status,
                 check_result.details,
                 old_status_str,
+            )
+            
+            # Broadcast status update to connected WebSocket clients
+            await websocket_manager.broadcast_status_update(
+                monitor_id=monitor.id,
+                monitor_name=monitor.name,
+                status=check_result.status,
+                response_time_ms=check_result.response_time_ms,
+                ssl_expiry_days=check_result.ssl_expiry_days,
+                details=check_result.details,
             )
             
             logger.debug(f"Monitor {monitor.name}: {check_result.status}")

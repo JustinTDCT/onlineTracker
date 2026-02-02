@@ -277,3 +277,137 @@ body {
 .site-footer p {
   @apply leading-tight;
 }
+
+/* Tag badge styles */
+.tag-badge {
+  @apply px-2 py-0.5 text-xs font-medium rounded-full border;
+}
+
+/* Sidebar layout styles */
+.sidebar-layout {
+  @apply flex flex-1 overflow-hidden;
+}
+
+.sidebar {
+  @apply w-72 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700;
+  @apply flex flex-col overflow-hidden;
+}
+
+.sidebar-header {
+  @apply p-4 border-b border-gray-200 dark:border-gray-700;
+}
+
+.sidebar-title {
+  @apply text-lg font-semibold text-gray-900 dark:text-white mb-3;
+}
+
+.sidebar-search {
+  @apply relative;
+}
+
+.sidebar-search-icon {
+  @apply absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400;
+}
+
+.sidebar-search-input {
+  @apply w-full text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg pl-9 pr-3 py-2;
+  @apply text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500;
+  @apply focus:ring-2 focus:ring-indigo-500 focus:outline-none;
+}
+
+.sidebar-content {
+  @apply flex-1 overflow-y-auto;
+}
+
+.sidebar-groups {
+  @apply py-2;
+}
+
+.sidebar-group {
+  @apply mb-1;
+}
+
+.sidebar-group-header {
+  @apply w-full flex items-center gap-2 px-4 py-2 text-left;
+  @apply hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors;
+}
+
+.sidebar-tag-badge {
+  @apply px-2 py-0.5 text-xs font-medium rounded-full border;
+}
+
+.sidebar-group-items {
+  @apply py-1;
+}
+
+.sidebar-monitor-item {
+  @apply flex items-center justify-between px-4 py-2 mx-2 rounded-lg;
+  @apply hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer;
+}
+
+.sidebar-monitor-item-active {
+  @apply bg-indigo-50 dark:bg-indigo-900/30;
+}
+
+.sidebar-status-dot {
+  @apply w-2 h-2 rounded-full flex-shrink-0;
+}
+
+.sidebar-main {
+  @apply flex-1 overflow-y-auto p-6;
+}
+
+/* Response time chart styles */
+.response-chart-container {
+  @apply bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4;
+}
+
+.response-chart-header {
+  @apply flex items-center justify-between mb-4;
+}
+
+.response-chart-title {
+  @apply text-sm font-medium text-gray-900 dark:text-white;
+}
+
+.response-chart-controls {
+  @apply flex items-center gap-1;
+}
+
+.response-chart-range-btn {
+  @apply px-2 py-1 text-xs font-medium rounded transition-colors;
+  @apply text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300;
+  @apply hover:bg-gray-200 dark:hover:bg-gray-600;
+}
+
+.response-chart-range-btn.active {
+  @apply bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400;
+}
+
+.response-chart-stats {
+  @apply flex items-center gap-6 mb-4;
+}
+
+.response-chart-stat {
+  @apply flex flex-col;
+}
+
+.response-chart-stat .label {
+  @apply text-xs text-gray-500 dark:text-gray-400;
+}
+
+.response-chart-stat .value {
+  @apply text-sm font-medium text-gray-900 dark:text-white;
+}
+
+.response-chart-wrapper {
+  @apply h-52;
+}
+
+.response-chart-empty {
+  @apply flex items-center justify-center h-full text-sm text-gray-400 dark:text-gray-500;
+}
+
+.response-chart-tooltip {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2;
+}

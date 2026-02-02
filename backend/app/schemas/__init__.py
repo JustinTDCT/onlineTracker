@@ -22,6 +22,13 @@ from .status import (
     StatusOverview,
     MonitorSummary,
 )
+from .tag import (
+    TagCreate,
+    TagUpdate,
+    TagResponse,
+    TagWithMonitorCount,
+    MonitorTagAssignment,
+)
 
 __all__ = [
     "MonitorCreate",
@@ -39,4 +46,9 @@ __all__ = [
     "SettingsUpdate",
     "StatusOverview",
     "MonitorSummary",
+    "TagCreate",
+    "TagUpdate",
+    "TagResponse",
+    "TagWithMonitorCount",
+    "MonitorTagAssignment",
 ]

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, AlertCircle, HelpCircle, Clock, Activity } from 'lucide-react';
-import { getMonitor, getMonitorHistory } from '../api/client';
+import { useParams } from 'react-router-dom';
+import { CheckCircle, AlertCircle, HelpCircle, Clock, Activity } from 'lucide-react';
+import { getMonitor, getMonitorHistory, getResponseTimes, ResponseTimePoint } from '../api/client';
 import type { Monitor, StatusHistoryPoint } from '../types';
 import StatusHistogram from './StatusHistogram';
 import ResultsTable from './ResultsTable';
+import ResponseTimeChart from './ResponseTimeChart';
 
 interface HistoryData {
   hours24: StatusHistoryPoint[];
@@ -15,9 +16,9 @@ interface HistoryData {
 
 export default function MonitorDetail() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [monitor, setMonitor] = useState<Monitor | null>(null);
   const [history, setHistory] = useState<HistoryData>({ hours24: [], week: [], month: [], year: [] });
+  const [responseTimes, setResponseTimes] = useState<ResponseTimePoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,15 +30,17 @@ export default function MonitorDetail() {
   async function loadMonitor(monitorId: number) {
     try {
       setLoading(true);
-      const [monitorData, h24, hWeek, hMonth, hYear] = await Promise.all([
+      const [monitorData, h24, hWeek, hMonth, hYear, rtData] = await Promise.all([
         getMonitor(monitorId),
         getMonitorHistory(monitorId, 24),
         getMonitorHistory(monitorId, 168),
         getMonitorHistory(monitorId, 720),
         getMonitorHistory(monitorId, 8760),
+        getResponseTimes(monitorId, 168), // Get 7 days of response time data
       ]);
       setMonitor(monitorData);
       setHistory({ hours24: h24, week: hWeek, month: hMonth, year: hYear });
+      setResponseTimes(rtData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load monitor');
@@ -90,10 +93,6 @@ export default function MonitorDetail() {
   if (error || !monitor) {
     return (
       <div className="space-y-4">
-        <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </button>
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400">
           {error || 'Monitor not found'}
         </div>
@@ -105,16 +104,27 @@ export default function MonitorDetail() {
 
   return (
     <div className="space-y-6">
+      {/* Monitor header */}
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/')} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{monitor.name}</h1>
             <span className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
               {monitor.type.toUpperCase()}
             </span>
+            {monitor.tags && monitor.tags.length > 0 && (
+              <div className="flex items-center gap-1">
+                {monitor.tags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="tag-badge"
+                    style={{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color }}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           {monitor.description && <p className="text-gray-500 dark:text-gray-400 mt-1">{monitor.description}</p>}
           <p className="text-sm text-gray-400 dark:text-gray-500">{monitor.target}</p>
@@ -160,6 +170,26 @@ export default function MonitorDetail() {
           </div>
         </div>
       </div>
+
+      {/* Response Time Chart - only for non-SSL monitors */}
+      {monitor.type !== 'ssl' && responseTimes.length > 0 && (
+        <div className="monitor-detail-section">
+          <ResponseTimeChart
+            data={responseTimes}
+            title="Response Time"
+            okThreshold={
+              monitor.type === 'ping'
+                ? monitor.config?.ping_ok_threshold_ms
+                : monitor.config?.http_ok_threshold_ms
+            }
+            degradedThreshold={
+              monitor.type === 'ping'
+                ? monitor.config?.ping_degraded_threshold_ms
+                : monitor.config?.http_degraded_threshold_ms
+            }
+          />
+        </div>
+      )}
 
       <div className="monitor-detail-section">
         <h2 className="monitor-detail-section-title">Uptime History</h2>

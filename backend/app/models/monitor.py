@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 
 from ..database import Base
+from .tag import monitor_tags
 
 
 class Monitor(Base):
@@ -26,3 +27,4 @@ class Monitor(Base):
     agent = relationship("Agent", back_populates="monitors")
     statuses = relationship("MonitorStatus", back_populates="monitor", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="monitor", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary=monitor_tags, back_populates="monitors")

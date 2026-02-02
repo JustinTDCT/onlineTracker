@@ -22,8 +22,10 @@ import {
   pollPage,
   getAgents,
   getMonitorDefaults,
+  getTags,
+  setMonitorTags,
 } from '../api/client';
-import type { Monitor, MonitorCreate, MonitorTestResult, Agent, MonitorDefaults } from '../types';
+import type { Monitor, MonitorCreate, MonitorTestResult, Agent, MonitorDefaults, Tag } from '../types';
 
 type TypeFilter = 'all' | 'ping' | 'http' | 'ssl';
 
@@ -32,6 +34,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 export default function MonitorList() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [defaults, setDefaults] = useState<MonitorDefaults | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -86,15 +89,17 @@ export default function MonitorList() {
 
   async function loadData() {
     try {
-      const [monitorsData, agentsData, defaultsData] = await Promise.all([
+      const [monitorsData, agentsData, defaultsData, tagsData] = await Promise.all([
         getMonitors(),
         getAgents(),
         getMonitorDefaults(),
+        getTags(),
       ]);
       setMonitors(monitorsData);
       // Only show approved agents
       setAgents(agentsData.filter(a => a.status === 'approved'));
       setDefaults(defaultsData);
+      setTags(tagsData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -105,8 +110,12 @@ export default function MonitorList() {
 
   async function loadMonitors() {
     try {
-      const data = await getMonitors();
-      setMonitors(data);
+      const [monitorsData, tagsData] = await Promise.all([
+        getMonitors(),
+        getTags(),
+      ]);
+      setMonitors(monitorsData);
+      setTags(tagsData);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load monitors');
@@ -210,17 +219,25 @@ export default function MonitorList() {
         <MonitorForm
           monitor={editingMonitor}
           agents={agents}
+          tags={tags}
           defaults={defaults}
           onClose={() => {
             setShowForm(false);
             setEditingMonitor(null);
           }}
-          onSave={async (data) => {
+          onSave={async (data, tagIds) => {
             try {
+              let monitorId: number;
               if (editingMonitor) {
                 await updateMonitor(editingMonitor.id, data);
+                monitorId = editingMonitor.id;
               } else {
-                await createMonitor(data);
+                const created = await createMonitor(data);
+                monitorId = created.id;
+              }
+              // Update tags
+              if (tagIds.length > 0 || (editingMonitor?.tags?.length ?? 0) > 0) {
+                await setMonitorTags(monitorId, tagIds);
               }
               await loadMonitors();
               setShowForm(false);
@@ -240,6 +257,7 @@ export default function MonitorList() {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tags</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Target</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Agent</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Interval</th>
@@ -250,7 +268,7 @@ export default function MonitorList() {
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {filteredMonitors.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={9} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                   {monitors.length === 0 
                     ? 'No monitors configured. Click "Add Monitor" to create one.'
                     : 'No monitors match your filters.'}
@@ -275,6 +293,27 @@ export default function MonitorList() {
                     <span className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
                       {monitor.type.toUpperCase()}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex flex-wrap gap-1">
+                      {monitor.tags && monitor.tags.length > 0 ? (
+                        monitor.tags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="tag-badge"
+                            style={{
+                              backgroundColor: tag.color + '20',
+                              color: tag.color,
+                              borderColor: tag.color,
+                            }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
                     {monitor.target}
@@ -413,12 +452,13 @@ export default function MonitorList() {
 interface FormProps {
   monitor: Monitor | null;
   agents: Agent[];
+  tags: Tag[];
   defaults: MonitorDefaults | null;
   onClose: () => void;
-  onSave: (data: MonitorCreate) => Promise<void>;
+  onSave: (data: MonitorCreate, tagIds: number[]) => Promise<void>;
 }
 
-function MonitorForm({ monitor, agents, defaults, onClose, onSave }: FormProps) {
+function MonitorForm({ monitor, agents, tags, defaults, onClose, onSave }: FormProps) {
   const [type, setType] = useState<'ping' | 'http' | 'https' | 'ssl'>(
     monitor?.type || 'ping'
   );
@@ -428,6 +468,9 @@ function MonitorForm({ monitor, agents, defaults, onClose, onSave }: FormProps) 
   const [interval, setInterval] = useState(monitor?.check_interval || defaults?.check_interval || 60);
   const [enabled, setEnabled] = useState(monitor?.enabled ?? true);
   const [agentId, setAgentId] = useState(monitor?.agent_id || '');
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
+    monitor?.tags?.map(t => t.id) || []
+  );
   const [expectedStatus, setExpectedStatus] = useState(
     monitor?.config?.expected_status?.toString() || ''
   );
@@ -536,7 +579,7 @@ function MonitorForm({ monitor, agents, defaults, onClose, onSave }: FormProps) 
       enabled,
       agent_id: agentId || undefined,
       config: Object.keys(config).length > 0 ? config : undefined,
-    });
+    }, selectedTagIds);
     
     setSaving(false);
   }
@@ -638,6 +681,49 @@ function MonitorForm({ monitor, agents, defaults, onClose, onSave }: FormProps) 
               Choose where this monitor runs from. Use agents to check from remote locations.
             </p>
           </div>
+
+          {tags.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tags
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <label
+                    key={tag.id}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer transition-all ${
+                      selectedTagIds.includes(tag.id)
+                        ? 'ring-2 ring-offset-1'
+                        : 'opacity-60 hover:opacity-100'
+                    }`}
+                    style={{
+                      backgroundColor: tag.color + '20',
+                      color: tag.color,
+                      borderColor: tag.color,
+                      ...(selectedTagIds.includes(tag.id) ? { ringColor: tag.color } : {}),
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTagIds.includes(tag.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedTagIds([...selectedTagIds, tag.id]);
+                        } else {
+                          setSelectedTagIds(selectedTagIds.filter(id => id !== tag.id));
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-medium">{tag.name}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Click tags to assign them to this monitor
+              </p>
+            </div>
+          )}
 
           {(type === 'http' || type === 'https') && (
             <>

@@ -13,6 +13,8 @@ import type {
   ExportData,
   ImportData,
   ImportResult,
+  Tag,
+  TagCreate,
 } from '../types';
 
 const API_BASE = '/api';
@@ -105,6 +107,19 @@ export async function getMonitorResults(
   );
 }
 
+export interface ResponseTimePoint {
+  timestamp: string;
+  response_time_ms: number | null;
+  status: string;
+}
+
+export async function getResponseTimes(
+  id: number,
+  hours = 24
+): Promise<ResponseTimePoint[]> {
+  return fetchJson(`${API_BASE}/monitors/${id}/response-times?hours=${hours}`);
+}
+
 // Agents
 export async function getAgents(): Promise<Agent[]> {
   return fetchJson(`${API_BASE}/agents`);
@@ -179,4 +194,45 @@ export async function importData(
 // Status
 export async function getStatusOverview(): Promise<StatusOverview> {
   return fetchJson(`${API_BASE}/status/overview`);
+}
+
+// Tags
+export async function getTags(): Promise<Tag[]> {
+  return fetchJson(`${API_BASE}/tags`);
+}
+
+export async function createTag(data: TagCreate): Promise<Tag> {
+  return fetchJson(`${API_BASE}/tags`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateTag(id: number, data: Partial<TagCreate>): Promise<Tag> {
+  return fetchJson(`${API_BASE}/tags/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteTag(id: number): Promise<void> {
+  return fetchJson(`${API_BASE}/tags/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function setMonitorTags(monitorId: number, tagIds: number[]): Promise<Tag[]> {
+  return fetchJson(`${API_BASE}/tags/monitors/${monitorId}/tags`, {
+    method: 'PUT',
+    body: JSON.stringify({ tag_ids: tagIds }),
+  });
+}
+
+export async function getMonitorTags(monitorId: number): Promise<Tag[]> {
+  return fetchJson(`${API_BASE}/tags/monitors/${monitorId}/tags`);
+}
+
+// Monitors with tag filter
+export async function getMonitorsByTag(tagId: number): Promise<Monitor[]> {
+  return fetchJson(`${API_BASE}/monitors?tag_id=${tagId}`);
 }

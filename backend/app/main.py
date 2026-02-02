@@ -3,7 +3,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -11,9 +11,10 @@ import os
 
 from .config import settings
 from .database import init_db, close_db
-from .routers import monitors_router, agents_router, settings_router, status_router, devices_router
+from .routers import monitors_router, agents_router, settings_router, status_router, devices_router, tags_router
 from .services.scheduler import scheduler_service
 from .services.agent_client import agent_client
+from .services.websocket_manager import websocket_manager
 
 # Configure logging
 logging.basicConfig(
@@ -143,6 +144,7 @@ def create_app() -> FastAPI:
     app.include_router(settings_router)
     app.include_router(status_router)
     app.include_router(devices_router)
+    app.include_router(tags_router)
     
     # Health check endpoint
     @app.get("/health")
@@ -151,6 +153,20 @@ def create_app() -> FastAPI:
             "status": "healthy",
             "mode": settings.mode,
         }
+    
+    # WebSocket endpoint for real-time status updates
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        await websocket_manager.connect(websocket)
+        try:
+            while True:
+                # Keep the connection alive by receiving pings
+                # Clients can send any message to keep the connection open
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            await websocket_manager.disconnect(websocket)
+        except Exception:
+            await websocket_manager.disconnect(websocket)
     
     # Serve frontend static files in server mode
     if settings.mode == "server":

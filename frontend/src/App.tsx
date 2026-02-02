@@ -6,8 +6,9 @@ import MonitorList from './components/MonitorList';
 import MonitorDetail from './components/MonitorDetail';
 import AgentList from './components/AgentList';
 import SettingsPage from './components/SettingsPage';
+import SidebarLayout from './components/SidebarLayout';
 
-export const APP_VERSION = '2.6.0';
+export const APP_VERSION = '2.7.0';
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -106,15 +107,31 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/monitor/:id" element={<MonitorDetail />} />
-          <Route path="/monitors" element={<MonitorList />} />
-          <Route path="/agents" element={<AgentList />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
-      </main>
+      <Routes>
+        {/* Monitor detail uses sidebar layout */}
+        <Route
+          path="/monitor/:id"
+          element={
+            <SidebarLayout>
+              <MonitorDetail />
+            </SidebarLayout>
+          }
+        />
+        {/* Other routes use standard layout */}
+        <Route
+          path="*"
+          element={
+            <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/monitors" element={<MonitorList />} />
+                <Route path="/agents" element={<AgentList />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Routes>
+            </main>
+          }
+        />
+      </Routes>
 
       {/* Footer */}
       <footer className="site-footer">

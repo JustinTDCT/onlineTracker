@@ -1,6 +1,6 @@
 """Monitor schemas for API."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -51,6 +51,13 @@ class MonitorUpdate(BaseModel):
     agent_id: Optional[str] = None  # Change agent assignment (empty string to unassign)
 
 
+class TagInfo(BaseModel):
+    """Minimal tag info for embedding in monitor responses."""
+    id: int
+    name: str
+    color: str
+
+
 class MonitorResponse(BaseModel):
     """Schema for monitor in API responses."""
     id: int
@@ -63,6 +70,7 @@ class MonitorResponse(BaseModel):
     check_interval: int
     enabled: bool
     created_at: datetime
+    tags: List[TagInfo] = []
     
     class Config:
         from_attributes = True

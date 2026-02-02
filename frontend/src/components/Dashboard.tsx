@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, Filter, HelpCircle, Search, Server, TrendingUp } from 'lucide-react';
-import { getMonitors, getMonitorHistory, getAgents } from '../api/client';
-import type { Monitor, StatusHistoryPoint, Agent } from '../types';
+import { Activity, AlertCircle, Calendar, CheckCircle, ChevronLeft, ChevronRight, Clock, Filter, HelpCircle, Search, Server, Tag as TagIcon, TrendingUp, Wifi, WifiOff } from 'lucide-react';
+import { getMonitors, getMonitorHistory, getAgents, getTags } from '../api/client';
+import type { Monitor, StatusHistoryPoint, Agent, Tag } from '../types';
 import MiniStatusGraph from './MiniStatusGraph';
+import { useWebSocket, StatusUpdate } from '../hooks/useWebSocket';
 
 type TypeFilter = 'all' | 'ping' | 'http' | 'ssl';
 
@@ -31,17 +32,46 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [monitors, setMonitors] = useState<MonitorWithHistory[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<TimeRange>(TIME_RANGES[0]);
   const [selectedAgent, setSelectedAgent] = useState<string>('all'); // 'all', 'server', or agent_id
+  const [selectedTag, setSelectedTag] = useState<string>('all'); // 'all' or tag_id
   const [selectedType, setSelectedType] = useState<TypeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Handle real-time status updates from WebSocket
+  const handleStatusUpdate = useCallback((update: StatusUpdate) => {
+    setMonitors((prevMonitors) =>
+      prevMonitors.map((monitor) => {
+        if (monitor.id === update.monitor_id) {
+          return {
+            ...monitor,
+            latest_status: {
+              status: update.status,
+              response_time_ms: update.response_time_ms,
+              checked_at: update.checked_at,
+              details: update.details,
+              ssl_expiry_days: update.ssl_expiry_days,
+            },
+          };
+        }
+        return monitor;
+      })
+    );
+  }, []);
+
+  // Connect to WebSocket for real-time updates
+  const { isConnected } = useWebSocket({
+    onStatusUpdate: handleStatusUpdate,
+  });
+
   useEffect(() => {
     loadAgents();
+    loadTags();
   }, []);
 
   useEffect(() => {
@@ -56,6 +86,15 @@ export default function Dashboard() {
       setAgents(agentList.filter(a => a.status === 'approved'));
     } catch {
       // Ignore errors loading agents
+    }
+  }
+
+  async function loadTags() {
+    try {
+      const tagList = await getTags();
+      setTags(tagList);
+    } catch {
+      // Ignore errors loading tags
     }
   }
 
@@ -85,7 +124,7 @@ export default function Dashboard() {
     }
   }
 
-  // Filter monitors based on selected agent, type, and search query
+  // Filter monitors based on selected agent, tag, type, and search query
   const filteredMonitors = useMemo(() => {
     let result = monitors;
     
@@ -94,6 +133,12 @@ export default function Dashboard() {
       result = result.filter(m => !m.agent_id);
     } else if (selectedAgent !== 'all') {
       result = result.filter(m => m.agent_id === selectedAgent);
+    }
+    
+    // Filter by tag
+    if (selectedTag !== 'all') {
+      const tagId = parseInt(selectedTag);
+      result = result.filter(m => m.tags?.some(t => t.id === tagId));
     }
     
     // Filter by type
@@ -116,12 +161,12 @@ export default function Dashboard() {
     }
     
     return result;
-  }, [monitors, selectedAgent, selectedType, searchQuery]);
+  }, [monitors, selectedAgent, selectedTag, selectedType, searchQuery]);
 
   // Reset to page 1 when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedAgent, selectedType, searchQuery, pageSize]);
+  }, [selectedAgent, selectedTag, selectedType, searchQuery, pageSize]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredMonitors.length / pageSize);
@@ -205,6 +250,27 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Live connection indicator */}
+      <div className="flex items-center justify-end">
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+          isConnected 
+            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+        }`}>
+          {isConnected ? (
+            <>
+              <Wifi className="h-4 w-4" />
+              <span>Live</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-4 w-4" />
+              <span>Connecting...</span>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -284,6 +350,23 @@ export default function Dashboard() {
                 <option value="ssl">SSL</option>
               </select>
             </div>
+            {tags.length > 0 && (
+              <div className="flex items-center gap-2">
+                <TagIcon className="h-4 w-4 text-gray-400" />
+                <select
+                  value={selectedTag}
+                  onChange={(e) => setSelectedTag(e.target.value)}
+                  className="text-sm bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Tags</option>
+                  {tags.map((tag) => (
+                    <option key={tag.id} value={tag.id.toString()}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Server className="h-4 w-4 text-gray-400" />
               <select
@@ -353,7 +436,7 @@ export default function Dashboard() {
                     onClick={() => navigate(`/monitor/${monitor.id}`)}
                     className="clickable-row px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   >
-                    {/* Row 1: Status icon + Name + Type tag (full width, no truncation) */}
+                    {/* Row 1: Status icon + Name + Type tag + Tags (full width, no truncation) */}
                     <div className="flex items-center gap-3 mb-2">
                       <div className={`p-2 rounded-lg shrink-0 ${statusBgColor(monitor.latest_status?.status)}`}>
                         {statusIcon(monitor.latest_status?.status)}
@@ -362,6 +445,19 @@ export default function Dashboard() {
                       <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded shrink-0">
                         {monitor.type.toUpperCase()}
                       </span>
+                      {monitor.tags && monitor.tags.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          {monitor.tags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="tag-badge"
+                              style={{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color }}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     
                     {/* Row 2: Description/target, Agent, Response, Graph, Status */}

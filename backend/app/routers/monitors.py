@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import Monitor, MonitorStatus, Setting
@@ -21,6 +22,7 @@ from ..schemas.monitor import (
     LatestStatus,
     PollPageRequest,
     PollPageResponse,
+    TagInfo,
 )
 from ..schemas.status import MonitorResult, ResultsPage
 from ..services.checker import checker_service
@@ -77,10 +79,20 @@ async def get_monitor_defaults(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("", response_model=List[MonitorWithStatus])
-async def list_monitors(db: AsyncSession = Depends(get_db)):
+async def list_monitors(
+    tag_id: Optional[int] = Query(None, description="Filter by tag ID"),
+    db: AsyncSession = Depends(get_db),
+):
     """List all monitors with their latest status."""
-    result = await db.execute(select(Monitor).order_by(Monitor.name))
-    monitors = result.scalars().all()
+    query = select(Monitor).options(selectinload(Monitor.tags)).order_by(Monitor.name)
+    
+    # Filter by tag if specified
+    if tag_id is not None:
+        from ..models import Tag
+        query = query.join(Monitor.tags).where(Tag.id == tag_id)
+    
+    result = await db.execute(query)
+    monitors = result.scalars().unique().all()
     
     response = []
     for monitor in monitors:
@@ -111,6 +123,7 @@ async def list_monitors(db: AsyncSession = Depends(get_db)):
             check_interval=monitor.check_interval,
             enabled=bool(monitor.enabled),
             created_at=monitor.created_at,
+            tags=[TagInfo(id=t.id, name=t.name, color=t.color) for t in monitor.tags],
             latest_status=LatestStatus(
                 status=latest.status,
                 response_time_ms=latest.response_time_ms,
@@ -161,13 +174,16 @@ async def create_monitor(monitor: MonitorCreate, db: AsyncSession = Depends(get_
         check_interval=db_monitor.check_interval,
         enabled=bool(db_monitor.enabled),
         created_at=db_monitor.created_at,
+        tags=[],  # New monitors have no tags initially
     )
 
 
 @router.get("/{monitor_id}", response_model=MonitorWithStatus)
 async def get_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
     """Get a specific monitor by ID."""
-    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    result = await db.execute(
+        select(Monitor).options(selectinload(Monitor.tags)).where(Monitor.id == monitor_id)
+    )
     monitor = result.scalar_one_or_none()
     
     if not monitor:
@@ -200,6 +216,7 @@ async def get_monitor(monitor_id: int, db: AsyncSession = Depends(get_db)):
         check_interval=monitor.check_interval,
         enabled=bool(monitor.enabled),
         created_at=monitor.created_at,
+        tags=[TagInfo(id=t.id, name=t.name, color=t.color) for t in monitor.tags],
         latest_status=LatestStatus(
             status=latest.status,
             response_time_ms=latest.response_time_ms,
@@ -217,7 +234,9 @@ async def update_monitor(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a monitor."""
-    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    result = await db.execute(
+        select(Monitor).options(selectinload(Monitor.tags)).where(Monitor.id == monitor_id)
+    )
     monitor = result.scalar_one_or_none()
     
     if not monitor:
@@ -258,6 +277,7 @@ async def update_monitor(
         check_interval=monitor.check_interval,
         enabled=bool(monitor.enabled),
         created_at=monitor.created_at,
+        tags=[TagInfo(id=t.id, name=t.name, color=t.color) for t in monitor.tags],
     )
 
 
@@ -514,3 +534,53 @@ async def get_monitor_results(
         per_page=per_page,
         total_pages=total_pages,
     )
+
+
+class ResponseTimePoint(BaseModel):
+    """A single response time data point for charting."""
+    timestamp: str
+    response_time_ms: Optional[int] = None
+    status: str
+
+
+@router.get("/{monitor_id}/response-times", response_model=List[ResponseTimePoint])
+async def get_response_times(
+    monitor_id: int,
+    hours: int = Query(default=24, ge=1, le=168),  # Max 7 days
+    db: AsyncSession = Depends(get_db),
+):
+    """Get response time data for charting (last N hours, sampled for performance)."""
+    result = await db.execute(select(Monitor).where(Monitor.id == monitor_id))
+    monitor = result.scalar_one_or_none()
+    
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    
+    # Get all status records in the time range
+    status_result = await db.execute(
+        select(MonitorStatus)
+        .where(
+            MonitorStatus.monitor_id == monitor_id,
+            MonitorStatus.checked_at >= cutoff,
+        )
+        .order_by(MonitorStatus.checked_at)
+    )
+    statuses = status_result.scalars().all()
+    
+    # For longer time ranges, sample the data to avoid sending too many points
+    # Aim for ~200-300 data points max
+    max_points = 300
+    if len(statuses) > max_points:
+        step = len(statuses) // max_points
+        statuses = statuses[::step]
+    
+    return [
+        ResponseTimePoint(
+            timestamp=s.checked_at.isoformat(),
+            response_time_ms=s.response_time_ms,
+            status=s.status,
+        )
+        for s in statuses
+    ]

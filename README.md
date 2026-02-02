@@ -1,15 +1,19 @@
 # OnlineTracker
 
-**Version 2.2.0**
+**Version 2.7.0**
 
-A Docker-based service monitoring system with support for distributed agents.
+A Docker-based service monitoring system with support for distributed agents. Inspired by [Uptime Kuma](https://github.com/louislam/uptime-kuma).
 
 ## Features
 
 - **Multiple check types**: Ping, HTTP/HTTPS, SSL certificate monitoring
 - **Configurable thresholds**: Per-monitor OK/Degraded/Down thresholds with system defaults
-- **72-hour status history** with visual graphs (like status.cursor.com)
+- **72-hour status history** with visual graphs
 - **Monitor detail page**: Click any monitor to view detailed status, uptime histograms (24h/week/month/year), and paginated check results
+- **Tag-based grouping**: Organize monitors with color-coded tags for easy filtering
+- **Real-time updates**: WebSocket-based live status updates without page refresh
+- **Response time charts**: Line charts showing response time trends over time
+- **Sidebar navigation**: Uptime Kuma-style sidebar with grouped monitors on detail pages
 - **Webhook and email alerts** for status changes and SSL expiry warnings
 - **Agent mode** for distributed monitoring from multiple locations
 - **PostgreSQL database**: Scalable, concurrent writes, production-ready

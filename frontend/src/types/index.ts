@@ -1,3 +1,17 @@
+// Tag types
+export interface Tag {
+  id: number;
+  name: string;
+  color: string;
+  created_at?: string;
+  monitor_count?: number;
+}
+
+export interface TagCreate {
+  name: string;
+  color?: string;
+}
+
 // Monitor types
 export interface MonitorConfig {
   expected_status?: number;
@@ -42,6 +56,7 @@ export interface Monitor {
   enabled: boolean;
   created_at: string;
   latest_status?: LatestStatus;
+  tags?: { id: number; name: string; color: string }[];
 }
 
 export interface MonitorCreate {
