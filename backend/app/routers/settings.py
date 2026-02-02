@@ -10,6 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Setting, Monitor, Agent, Tag
+from ..models.monitor_status import MonitorStatus
+from ..models.ping_result import PingResult
+from ..models.alert import Alert
+from ..models.tag import monitor_tags
 from ..models.settings import DEFAULT_SETTINGS
 from sqlalchemy.orm import selectinload
 from ..schemas.settings import SettingsResponse, SettingsUpdate
@@ -351,27 +355,39 @@ async def import_data(
                     db.add(setting)
                 settings_count += 1
         
+        # If replacing, delete all dependent data first (in correct order)
+        if replace_existing:
+            # Delete in order: status -> ping_results -> alerts -> monitor_tags -> monitors -> tags
+            await db.execute(delete(MonitorStatus))
+            await db.execute(delete(PingResult))
+            await db.execute(delete(Alert))
+            await db.execute(delete(monitor_tags))
+            await db.execute(delete(Monitor))
+            await db.execute(delete(Tag))
+            await db.flush()
+        
         # Import tags (must be done before monitors to establish tag references)
         tag_name_to_obj = {}
         if data.tags:
-            if replace_existing:
-                # Delete existing tags
-                await db.execute(delete(Tag))
-            
             for t in data.tags:
-                # Check if tag with same name exists
-                result = await db.execute(select(Tag).where(Tag.name == t.name))
-                existing = result.scalar_one_or_none()
-                
-                if existing:
-                    if replace_existing:
-                        existing.color = t.color
-                    tag_name_to_obj[t.name] = existing
-                else:
+                # If replace_existing, all tags were deleted above, so just create
+                if replace_existing:
                     new_tag = Tag(name=t.name, color=t.color)
                     db.add(new_tag)
                     tag_name_to_obj[t.name] = new_tag
-                tags_count += 1
+                    tags_count += 1
+                else:
+                    # Check if tag with same name exists
+                    result = await db.execute(select(Tag).where(Tag.name == t.name))
+                    existing = result.scalar_one_or_none()
+                    
+                    if existing:
+                        tag_name_to_obj[t.name] = existing
+                    else:
+                        new_tag = Tag(name=t.name, color=t.color)
+                        db.add(new_tag)
+                        tag_name_to_obj[t.name] = new_tag
+                        tags_count += 1
             
             # Flush to ensure tags have IDs
             await db.flush()
@@ -384,34 +400,9 @@ async def import_data(
         
         # Import monitors
         if data.monitors:
-            if replace_existing:
-                # Delete existing monitors
-                await db.execute(delete(Monitor))
-            
             for m in data.monitors:
-                # Check if monitor with same name exists
-                result = await db.execute(
-                    select(Monitor).options(selectinload(Monitor.tags)).where(Monitor.name == m.name)
-                )
-                existing = result.scalar_one_or_none()
-                
-                if existing and not replace_existing:
-                    # Update existing monitor
-                    existing.type = m.type
-                    existing.description = m.description
-                    existing.target = m.target
-                    existing.config = json.dumps(m.config) if m.config else None
-                    existing.check_interval = m.check_interval
-                    existing.enabled = 1 if m.enabled else 0
-                    existing.agent_id = m.agent_id
-                    
-                    # Update tags
-                    if m.tags:
-                        existing.tags = [tag_name_to_obj[name] for name in m.tags if name in tag_name_to_obj]
-                    else:
-                        existing.tags = []
-                else:
-                    # Create new monitor
+                if replace_existing:
+                    # All monitors were deleted above, just create new ones
                     new_monitor = Monitor(
                         type=m.type,
                         name=m.name,
@@ -428,7 +419,49 @@ async def import_data(
                         new_monitor.tags = [tag_name_to_obj[name] for name in m.tags if name in tag_name_to_obj]
                     
                     db.add(new_monitor)
-                monitors_count += 1
+                    monitors_count += 1
+                else:
+                    # Check if monitor with same name exists
+                    result = await db.execute(
+                        select(Monitor).options(selectinload(Monitor.tags)).where(Monitor.name == m.name)
+                    )
+                    existing = result.scalar_one_or_none()
+                    
+                    if existing:
+                        # Update existing monitor
+                        existing.type = m.type
+                        existing.description = m.description
+                        existing.target = m.target
+                        existing.config = json.dumps(m.config) if m.config else None
+                        existing.check_interval = m.check_interval
+                        existing.enabled = 1 if m.enabled else 0
+                        existing.agent_id = m.agent_id
+                        
+                        # Update tags
+                        if m.tags:
+                            existing.tags = [tag_name_to_obj[name] for name in m.tags if name in tag_name_to_obj]
+                        else:
+                            existing.tags = []
+                        monitors_count += 1
+                    else:
+                        # Create new monitor
+                        new_monitor = Monitor(
+                            type=m.type,
+                            name=m.name,
+                            description=m.description,
+                            target=m.target,
+                            config=json.dumps(m.config) if m.config else None,
+                            check_interval=m.check_interval,
+                            enabled=1 if m.enabled else 0,
+                            agent_id=m.agent_id,
+                        )
+                        
+                        # Assign tags
+                        if m.tags:
+                            new_monitor.tags = [tag_name_to_obj[name] for name in m.tags if name in tag_name_to_obj]
+                        
+                        db.add(new_monitor)
+                        monitors_count += 1
         
         # Import agents
         if data.agents:
