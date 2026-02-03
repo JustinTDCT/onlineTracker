@@ -194,7 +194,14 @@ export default function MonitorList() {
             </select>
           </div>
           <button
-            onClick={() => {
+            onClick={async () => {
+              // Refresh defaults from settings before opening form
+              try {
+                const freshDefaults = await getMonitorDefaults();
+                setDefaults(freshDefaults);
+              } catch (err) {
+                console.error('Failed to refresh defaults:', err);
+              }
               setEditingMonitor(null);
               setShowForm(true);
             }}

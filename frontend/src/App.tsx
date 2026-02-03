@@ -8,7 +8,7 @@ import AgentList from './components/AgentList';
 import SettingsPage from './components/SettingsPage';
 import SidebarLayout from './components/SidebarLayout';
 
-export const APP_VERSION = '2.7.0';
+export const APP_VERSION = '2.7.1';
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
